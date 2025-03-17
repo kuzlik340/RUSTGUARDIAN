@@ -16,7 +16,18 @@ The project consists of two main components:
 
 Through this project, we want to get experience with Rust’s memory safety features, concurrency, and system-level programming, while building something useful and security-focused! 
 
-## Requirments
+## Requirements
+The kernel module itself will provide:
+1) Safety (No kernel panics and glitches while running in all modes)
+2) Two or more modes to work. Lockdown mode which will open scan all devices without any sleep. Also a mode which will just compare if connected device is in the safe list.
+3) The user-space API: Adding/Deleting safe devices, start Lockdown mode, change modes, send/receive other commands.
+
+The user-space module will provide:
+1) 
+
+
+
+## Dependencies
 ### Kernel module
 Firstly to create a kernel module we have to install the 
 nightly toolchain.
