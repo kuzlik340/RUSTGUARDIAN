@@ -73,5 +73,8 @@ To handle terminal output, text formatting, and user input processing, We will u
 [dependencies]
 crossterm = "0.27"
 ```
+<img width="336" alt="Screenshot 2025-03-18 at 14 15 49" src="https://github.com/user-attachments/assets/b1d96af8-3651-42a0-8768-73953ad1f14b" />
+
+
 
 
