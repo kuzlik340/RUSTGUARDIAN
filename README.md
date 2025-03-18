@@ -48,7 +48,7 @@ sudo apt install raspberrypi-kernel-headers
 ```
 Then we have to download bindgen tool for rust. By this tool
 it is possible to bind C headers to Rust modules.
-```bash
+```bash![rust_proj.drawio.svg](../../../Downloads/rust_proj.drawio.svg)
 cargo install bindgen
 ```
 And in the **cargo.toml** we have to write this dependency:
