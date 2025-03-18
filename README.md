@@ -34,13 +34,12 @@ Sketch of how the CLI will look
 
 The command space will support various commands, some of which are yet to be defined in the project. However, the following are the essential ones for this stage of development:
 ```
-> add device [device_id]
-> del device [device_id]
-> quit or exit
-> enable LockDown
-> enable SafeConnection
-> disable LockDown
-> disable SafeConnection
+> add device [device_id]  # Will add device to a safe list
+> del device [device_id]  # Will delete device from safe list  
+> enable LockDown         # Will enable safest mode for polling all devices
+> enable SafeConnection   # Will enable mode that will only check if the device that was connected is in safe mode 
+> disable LockDown        # Will disable polling
+> disable SafeConnection  # Will disable checking all devices is they are in safe list
 ```
 
 
