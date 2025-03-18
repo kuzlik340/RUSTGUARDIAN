@@ -23,7 +23,13 @@ The kernel module itself will provide:
 3) The user-space API: Adding/Deleting safe devices, start Lockdown mode, change modes, send/receive other commands.
 
 The user-space module will provide:
-1) 
+1) Device Logs - shows the exact time of the event, the hardware component involved (e.g., USB port, storage controller), details from the system about the detected device.
+2) Safe Devices List – shows user-approved devices that won’t be tracked as unrecognized.
+3) Commands Space - an interactive input area where users can enter commands to control and manage devices.
+
+Sketch of how the CLI will look
+
+<img width="818" alt="CLI" src="https://github.com/user-attachments/assets/a09c85a2-ea63-4568-b793-3e45e0337f41" />
 
 
 
