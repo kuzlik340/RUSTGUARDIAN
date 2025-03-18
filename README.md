@@ -1,7 +1,7 @@
 # RUST_PROJECT
 ## Project Team
-- **Aliaksei Zimnitski** – [User-space CLI]
-- **Timofei Kuzin** – [Kernel module]
+- **Aliaksei Zimnitski** – xzimnitski@stiba.sk
+- **Timofei Kuzin** – xkuzin@stuba.sk
 
 
 ## Introduction
@@ -18,9 +18,9 @@ Through this project, we want to get experience with Rust’s memory safety feat
 
 ## Requirements
 The kernel module itself will provide:
-1) Safety (No kernel panics and glitches while running in all modes)
-2) Two or more modes to work. Lockdown mode which will open scan all devices without any sleep. Also a mode which will just compare if connected device is in the safe list.
-3) The user-space API: Adding/Deleting safe devices, start Lockdown mode, change modes, send/receive other commands.
+1) Two or more modes to work. Lockdown mode which will open scan all devices without any sleep. Also a mode which will just compare if connected device is in the safe list.
+2) The user-space API: Adding/Deleting safe devices, start Lockdown mode, change modes, send responses / receive other commands.
+3) Checking all devices for their behaviour. Disconnecting the device and sending a notification if malicious device was suspected
 
 The user-space module will provide:
 1) Device Logs - shows the exact time of the event, the hardware component involved (e.g., USB port, storage controller), details from the system about the detected device.
@@ -73,8 +73,16 @@ To handle terminal output, text formatting, and user input processing, We will u
 [dependencies]
 crossterm = "0.27"
 ```
+
+# Diagram of project
 <img width="336" alt="Screenshot 2025-03-18 at 14 15 49" src="https://github.com/user-attachments/assets/b1d96af8-3651-42a0-8768-73953ad1f14b" />
 
 
 
+```mermaid
+graph TD;
+    A[Notification mechanism] --> B[CLI interface];
+    B --> C[Kernel module];
+    C[Kernel module] -->|Polling devices (Lockdown mode)| C;
+    C -->|Checking new connections (Safe mode)| C;
 
