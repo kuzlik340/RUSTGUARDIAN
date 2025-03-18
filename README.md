@@ -22,7 +22,7 @@
 ```
 
 ## Project Team
-- **Aliaksei Zimnitski** – xzimnitski@stiba.sk
+- **Aliaksei Zimnitski** – xzimnitski@stuba.sk
 - **Timofei Kuzin** – xkuzin@stuba.sk
 
 
