@@ -88,23 +88,23 @@ crossterm = "0.27"
 # Diagram of project
 
 ```
-                                      ┌──────────────────────────┐          
-                                      │                          │          
-                                      │  Notification mechanism  │          
-                                      │                          │          
-                                      └────────────▲─────────────┘          
-                                                   │                        
-                                       ┌───────────┼────────────┐           
-                                       │                        │           
-                                       │      CLI interface     │           
-                                       │                        │           
-                                       └─────┬──────────────▲───┘           
-                                             │              │               
-                                  ┌──────────▼──────────────┼──────────────┐
-                                  │             Kernel module              │
-                                  │                                        │
-                                  │  -Polling devices(Lockdown mode)       │
-                                  │  -Checking new connections(Safe mode)  │
-                                  │                                        │
-                                  └────────────────────────────────────────┘
+                                  ┌──────────────────────────┐          
+                                  │                          │          
+                                  │  Notification mechanism  │          
+                                  │                          │          
+                                  └────────────▲─────────────┘          
+                                               │                        
+                                   ┌───────────┼────────────┐           
+                                   │                        │           
+                                   │      CLI interface     │           
+                                   │                        │           
+                                   └─────┬──────────────▲───┘           
+                                         │              │               
+                              ┌──────────▼──────────────┼──────────────┐
+                              │             Kernel module              │
+                              │                                        │
+                              │  -Polling devices(Lockdown mode)       │
+                              │  -Checking new connections(Safe mode)  │
+                              │                                        │
+                              └────────────────────────────────────────┘
 ```
