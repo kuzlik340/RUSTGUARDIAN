@@ -83,6 +83,6 @@ crossterm = "0.27"
 graph TD;
     A[Notification mechanism] --> B[CLI interface];
     B --> C[Kernel module];
-    C[Kernel module] -->|Polling devices (Lockdown mode)| C;
-    C -->|Checking new connections (Safe mode)| C;
+    C --> D[Polling devices (Lockdown mode)];
+    C --> E[Checking new connections (Safe mode)];
 
