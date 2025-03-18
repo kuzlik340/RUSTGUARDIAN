@@ -7,6 +7,7 @@
 ## Introduction
 
 The goal of this project is to develop a **kernel module** with a **user-friendly interface** that monitors all **USB devices** and blocks them if malicious activity is detected.
+Basically, this project solves a problem with the badUSB attacks that are quite popular nowadays. 
 
 The project consists of two main components:
 
@@ -14,13 +15,13 @@ The project consists of two main components:
 
 2. **User-Space Module** – This component runs in **user space** and provides a **CLI interface** along with **real-time notifications** when a potentially harmful USB device is detected.
 
-Through this project, we want to get experience with Rust’s memory safety features, concurrency, and system-level programming, while building something useful and security-focused! 
+Through this project, we will get experience with Rust’s memory safety features, concurrency, and system-level programming, while building security-focused project to keep badUSB devices away from the OS. 
 
 ## Requirements
 The kernel module itself will provide:
 1) Two or more modes to work. Lockdown mode which will open scan all devices without any sleep. Also a mode which will just compare if connected device is in the safe list.
 2) The user-space API: Adding/Deleting safe devices, start Lockdown mode, change modes, send responses / receive other commands.
-3) Checking all devices for their behaviour. Disconnecting the device and sending a notification if malicious device was suspected
+3) Checking all devices for their behaviour. Disconnecting the device and sending a notification if malicious device was suspected.
 
 The user-space module will provide:
 1) Device Logs - shows the exact time of the event, the hardware component involved (e.g., USB port, storage controller), details from the system about the detected device.
@@ -30,6 +31,17 @@ The user-space module will provide:
 Sketch of how the CLI will look
 
 <img width="818" alt="CLI" src="https://github.com/user-attachments/assets/a09c85a2-ea63-4568-b793-3e45e0337f41" />
+
+The command space will support various commands, some of which are yet to be defined in the project. However, the following are the essential ones for this stage of development:
+```
+> add device [device_id]
+> del device [device_id]
+> quit or exit
+> enable LockDown
+> enable SafeConnection
+> disable LockDown
+> disable SafeConnection
+```
 
 
 
@@ -47,7 +59,7 @@ libraries from Linux Kernel.
 sudo apt install raspberrypi-kernel-headers
 ```
 Then we have to download bindgen tool for rust. By this tool
-it is possible to bind C headers to Rust modules.
+it is possible to bind Linux headers to Rust modules.
 ```bash![rust_proj.drawio.svg](../../../Downloads/rust_proj.drawio.svg)
 cargo install bindgen
 ```
