@@ -85,7 +85,7 @@ To handle terminal output, text formatting, and user input processing, We will u
 crossterm = "0.27"
 ```
 
-# Diagram of project
+# Project diagram
 
 ```
                                   ┌──────────────────────────┐          
