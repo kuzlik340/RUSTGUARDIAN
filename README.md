@@ -21,91 +21,103 @@
 .                   *          ++                                                                                                      
 ```
 
-## Project Team
-- **Aliaksei Zimnitski** – xzimnitski@stuba.sk
-- **Timofei Kuzin** – xkuzin@stuba.sk
 
+
+## Project Team
+- Aliaksei Zimnitski – xzimnitski@stuba.sk
+- Timofei Kuzin – xkuzin@stuba.sk
 
 ## Introduction
+The goal of this project is to develop a **lightweight USB antivirus** with a **CLI** that monitors all **USB devices** in **user space** and blocks them if suspicious activity is detected. In addition to simply blocking unknown devices, the application also **scans files** on newly connected USB flash drives to detect potential malware. This feature is aimed at preventing attacks where a USB drive might deliver malicious executables or scripts.
 
-The goal of this project is to develop a **kernel module** with a **user-friendly interface** that monitors all **USB devices** and blocks them if malicious activity is detected.
-Basically, this project solves a problem with the badUSB attacks that are quite popular nowadays. 
+The project consists of two main parts:
 
-The project consists of two main components:
+1. **Application Core (User-Space Daemon)** – A Rust-based program that:
+    - Continuously **listens for new USB devices** using `udev`.
+    - Whenever a device is plugged in, checks if it is in the **Safe Devices List**.
+    - If it is a **USB flash drive (mass storage)**, automatically scans its **files** for known malicious signatures (through an external scanning API or local engine like ClamAV).
+    - If malware is detected or the device is not allowed, the daemon blocks it and notifies the user.
 
-1. **Kernel Module** – This module operates at the **kernel level**, continuously monitoring USB devices to track their activity. For example, it will check whether a **USB flash drive remains a storage device** or has re-enumerated as an **HID device** (such as a keyboard).
+2. **CLI Interface** – A command-line interface that provides the user with controls to:
+    - Add or remove devices from the safe list.
+    - View and manage scan results and any suspicious findings.
+    - Receive notifications if a newly connected USB device appears malicious or is not approved.
+    - Access a device event log (timestamps, device details, scan status, etc.).
 
-2. **User-Space Module** – This component runs in **user space** and provides a **CLI interface** along with **real-time notifications** when a potentially harmful USB device is detected.
+By focusing on user-space handling of devices (rather than a kernel module) and integrating a **file scanning step**, we ensure that suspicious USB devices not only get blocked on the basis of unknown hardware IDs but also based on the detection of potentially harmful files on the drive itself.
 
-Through this project, we will get experience with Rust’s memory safety features, concurrency, and system-level programming, while building security-focused project to keep badUSB devices away from the OS. 
+Requirements
+Since the application now operates completely in user space, the main requirements are:
 
-## Requirements
-The kernel module itself will provide:
-1) Two or more modes to work. Lockdown mode which will open scan all devices without any sleep. Also a mode which will just compare if connected device is in the safe list.
-2) The user-space API: Adding/Deleting safe devices, start Lockdown mode, change modes, send responses / receive other commands.
-3) Checking all devices for their behaviour. Disconnecting the device and sending a notification if malicious device was suspected.
+1. Safe Devices Management
+    - Ability to add or remove devices (identified by Vendor ID, Product ID, and optionally a serial number) from a “safe list.”
+    - Automatic blocking of devices not in the safe list (depending on the enabled mode).
 
-The user-space module will provide:
-1) Device Logs - shows the exact time of the event, the hardware component involved (e.g., USB port, storage controller), details from the system about the detected device.
-2) Safe Devices List – shows user-approved devices that won’t be tracked as unrecognized.
-3) Commands Space - an interactive input area where users can enter commands to control and manage devices.
+2. Two Monitoring Modes
+    - LockDown Mode: Continuously polls all connected USB ports/devices at a chosen interval. If any device doesn’t match the safe list, it gets blocked or triggers a user notification.
+    - SafeConnection Mode: Listens for new USB device events from the system (via udev). Whenever a new device is plugged in, the application checks if it’s safe and either allows or blocks it.
 
-Sketch of how the CLI will look
+3. User Notification
+    - Provides real-time alerts (desktop notifications) when a device is blocked, or suspicious behavior is detected.
 
-<img width="818" alt="CLI" src="https://github.com/user-attachments/assets/a09c85a2-ea63-4568-b793-3e45e0337f41" />
+4. Logging and CLI
+    - Logs device connections/disconnections with timestamps and device details.
+    - An interactive CLI for:
+        - Listing logs
+        - Showing and editing the safe list
+        - Toggling modes (LockDown or SafeConnection)
 
-The command space will support various commands, some of which are yet to be defined in the project. However, the following are the essential ones for this stage of development:
-```
-> add device [device_id]  # Will add device to a safe list
-> del device [device_id]  # Will delete device from safe list  
-> enable LockDown         # Will enable safest mode for polling all devices
-> enable SafeConnection   # Will enable mode that will only check if the device that was connected is in safe mode 
-> disable LockDown        # Will disable polling
-> disable SafeConnection  # Will disable checking all devices is they are in safe list
-```
-
-
-
-## Dependencies
-### Kernel module
-Firstly to create a kernel module we have to install the 
-nightly toolchain.
-```bash
-rustup install nightly
-rustup component add rust-src --toolchain nightly
-```
-Also we have to install the linux headers since we will use some
-libraries from Linux Kernel.
-```bash
-sudo apt install raspberrypi-kernel-headers
-```
-Then we have to download bindgen tool for rust. By this tool
-it is possible to bind Linux headers to Rust modules.
-```bash![rust_proj.drawio.svg](../../../Downloads/rust_proj.drawio.svg)
-cargo install bindgen
-```
-And in the **cargo.toml** we have to write this dependency:
-```
+Dependencies
+User-Space Monitoring (udev)
+To monitor USB devices without writing a kernel module, we use udev:
+sudo apt-get update
+sudo apt-get install libudev-dev
+Then, in Cargo.toml:
 [dependencies]
-kernel = { git = "https://github.com/Rust-for-Linux/linux", branch = "rust" }
-```
-### User-space CLI
-#### Desktop Notifications
-To enable desktop notifications in Unix-based systems, we need to install the notify-rust library. It allows sending system notifications through the DBus notification daemon, which is commonly used in Linux desktop environments.
-```bash
-sudo apt install libdbus-1-dev
-```
-And add it to the Cargo.toml:
-```bash
+udev = "0.6"
+
+Desktop Notifications
+For desktop notifications on Linux:
+sudo apt-get install libdbus-1-dev
+And add to Cargo.toml:
 [dependencies]
 notify-rust = "4.8"
-```
-#### Terminal Interaction
-To handle terminal output, text formatting, and user input processing, We will use the **crossterm** library. This library provides essential functions for controlling the terminal, such as handling colored text output, cursor movement, and key event detection.
-```bash
+
+Terminal Interaction
+We use crossterm for CLI input and output:
 [dependencies]
 crossterm = "0.27"
-```
+
+Logging & Extended Features
+- env_logger or any Rust logging framework for structured logs.
+- rusqlite (if storing logs or safe device lists in an SQLite database).
+- serde + serde_json (if serializing logs or device configurations to JSON).
+
+Below is an example Cargo.toml snippet (combining everything):
+[package]
+name = "usb_antivirus"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+crossterm = "0.27"
+notify-rust = "4.8"
+udev = "0.6"
+log = "0.4"
+env_logger = "0.9"
+rusqlite = "0.29"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+Command Examples
+A typical CLI might support commands like:
+> add device [device_id]  # Add device to the safe list
+> del device [device_id]  # Remove device from the safe list
+> enable LockDown         # Periodically polls all USB devices (strict mode)
+> disable LockDown        # Disables the polling mechanism
+> enable SafeConnection   # Reacts only to new devices via udev
+> disable SafeConnection  # Stops reacting to new device events
+> list logs               # Displays recent device events/logs
 
 # Project diagram
 
