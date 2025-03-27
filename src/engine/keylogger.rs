@@ -5,7 +5,7 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::io::{self, Write};
 use chrono::Local;
 
-fn start_logging() -> std::io::Result<()> {
+pub fn start_logging() -> std::io::Result<()> {
     let device_path = "/dev/input/event3"; // измени путь на актуальный
     let mut device = Device::open(device_path).expect("Failed to open device");
 
