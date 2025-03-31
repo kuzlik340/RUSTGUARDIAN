@@ -1,5 +1,6 @@
 use evdev::{Device, InputEventKind, Key};
 use std::collections::HashMap;
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::fs::OpenOptions;
 use std::os::unix::fs::OpenOptionsExt;
 use std::io::{self, Write};
@@ -20,15 +21,31 @@ pub fn start_logging() -> std::io::Result<()> {
     println!("[{}] Starting listening for keyboard activities", timestamp);
     let key_map = create_keymap();
     let mut backspace_found: bool = false;
+    let mut timestamps: Vec<u128> = Vec::new();
     loop {
         for ev in device.fetch_events().expect("Failed to fetch events") {
             if let InputEventKind::Key(key) = ev.kind() {
                 if ev.value() == 1 {
+                    let now = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .expect("Time went backwards")
+                        .as_millis();
+                    timestamps.push(now);
+                    if timestamps.len() >= 5 {
+                        let mut sum_deltas = 0u128;
+                        for i in 1..timestamps.len() {
+                            sum_deltas += timestamps[i] - timestamps[i - 1];
+                        }
+                        let avg_speed_in_ms = sum_deltas as f64 / (timestamps.len() - 1) as f64;
+
+                        if avg_speed_in_ms < 150.0 {
+                            println!("⚠️ RustGuardian registered BadUSB attack, avg_speed: {:.2} ms", avg_speed_in_ms);
+
+                        }
+                    }
                     if key != Key::KEY_BACKSPACE {
                         backspace_found = false;
                         if let Some(character) = key_map.get(&key) {
-                            print!("{}", character);
-                            io::stdout().flush().unwrap();
                             log_file.write_all(character.as_bytes())?;
                             log_file.flush()?;
                         }
