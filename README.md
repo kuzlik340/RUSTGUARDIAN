@@ -134,8 +134,9 @@ crossterm = "0.27"
 # TODO - section for team
 - [ ] KeyLogger - will be logging all keyboard events and will allow something to run from keyboard only if it is safe. (Assigned to Kuzin)
 - [ ] Speed checker - BadUSB will input all comands very fast, we have to check the speed of symbols written into terminal (Assigned to Kuzin)
-- [ ] Create white-list functions (Asigned to Zimnitski)
-- [ ] Run through files on mountable volume and create hashes of files (Assigned to Kuzin)
-- [ ] Connect VirusTotal API and check hash of files (Assigned to Kuzin)
 - [ ] CLI - create a CLI that will check the commands in command space and will print out logs (Assigned to Zinmitski)
+- [ ] Create white-list functions (Asigned to Zimnitski)
+- [ ] Run through files on mountable volume and create hashes of files (Assigned to Zimnitski)
+- [ ] Connect VirusTotal API and check hash of files (Assigned to Kuzin)
 - [ ] Notification mechanism - create a system that will notify user if something goes wrong (Assigned to Zinmitski)
+- [ ] Create list of unsecure commands from keyboard (Asigned to both)

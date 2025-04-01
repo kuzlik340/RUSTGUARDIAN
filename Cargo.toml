@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 evdev = "0.12"
 chrono = "0.4"
+udev = "0.6"

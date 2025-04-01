@@ -6,10 +6,9 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::io::{self, Write};
 use chrono::Local;
 
-pub fn start_logging() -> std::io::Result<()> {
-    let device_path = "/dev/input/event3";
+pub fn start_logging(device_path: &str, device_name: &str) -> std::io::Result<()> {
+    /* Open device events with the path that will be sent from main thread */
     let mut device = Device::open(device_path).expect("Failed to open device");
-
     let mut log_file = OpenOptions::new()
         .create(true)
         .write(true)
@@ -18,30 +17,48 @@ pub fn start_logging() -> std::io::Result<()> {
         .open("logg.txt")?;
     let now = Local::now(); // Gets local time
     let timestamp = now.format("%Y-%m-%d %H:%M:%S").to_string();
+    write!(log_file, "[{}] Starting listening for events on the device with path: {}\n", timestamp, device_path)?;
+    log_file.flush()?;
     println!("[{}] Starting listening for keyboard activities", timestamp);
     let key_map = create_keymap();
     let mut backspace_found: bool = false;
     let mut timestamps: Vec<u128> = Vec::new();
-    loop {
+    let mut run = true;
+    let mut speed_test = true;
+    'outer: loop {
         for ev in device.fetch_events().expect("Failed to fetch events") {
             if let InputEventKind::Key(key) = ev.kind() {
-                if ev.value() == 1 {
+                if ev.value() == 1 { //check разница между всеми нажатиями
                     let now = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .expect("Time went backwards")
                         .as_millis();
-                    timestamps.push(now);
-                    if timestamps.len() >= 5 {
-                        let mut sum_deltas = 0u128;
+                    /* Saving timestamp of click since we want to measure the difference in time between each clicks */
+                    if speed_test {
+                        timestamps.push(now);
+                    }
+                    if timestamps.len() >= 7 {
+                        let mut time_diff_clicks: Vec<u128> = Vec::new();
                         for i in 1..timestamps.len() {
-                            sum_deltas += timestamps[i] - timestamps[i - 1];
+                            time_diff_clicks.push(timestamps[i] - timestamps[i - 1]);
                         }
-                        let avg_speed_in_ms = sum_deltas as f64 / (timestamps.len() - 1) as f64;
-
-                        if avg_speed_in_ms < 150.0 {
-                            println!("⚠️ RustGuardian registered BadUSB attack, avg_speed: {:.2} ms", avg_speed_in_ms);
-
+                        let alltime: u128 = time_diff_clicks.iter().sum();
+                        let avg_speed_in_ms = alltime as f32 / time_diff_clicks.len() as f32;
+                        let mut too_small_diff = 0;
+                        for &diff in &time_diff_clicks {
+                            if (diff as f32 - avg_speed_in_ms).abs() < 150.0 {
+                                too_small_diff += 1;
+                            }
                         }
+                        if too_small_diff > 5 {
+                            let now = Local::now(); // Gets local time
+                            let timestamp = now.format("%Y-%m-%d %H:%M:%S").to_string();
+                            println!("[{}] \x1b[31mWARNING\x1b[0m  RustGuardian registered BadUSB attack, the device will be unmounted", timestamp);
+                            // Here will be unmounting and closing all processes module
+                            println!("[{}] Device was succesfully removed", timestamp);
+                            break 'outer;
+                        }
+                        speed_test = false;
                     }
                     if key != Key::KEY_BACKSPACE {
                         backspace_found = false;
@@ -54,8 +71,6 @@ pub fn start_logging() -> std::io::Result<()> {
                             continue;
                         }
                         else{
-                            println!();
-                            io::stdout().flush().unwrap();
                             log_file.write_all(b"\n")?;
                             log_file.flush()?;
                             backspace_found = true;
@@ -65,6 +80,7 @@ pub fn start_logging() -> std::io::Result<()> {
             }
         }
     }
+    Ok(())
 }
 
 /* Hashmap to write the text as user inputs it */
