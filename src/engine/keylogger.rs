@@ -3,12 +3,13 @@ use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::fs::OpenOptions;
 use std::os::unix::fs::OpenOptionsExt;
-use std::io::{self, Write};
+use std::io::{Write};
 use chrono::Local;
+use std::process::Command;
 
-pub fn start_logging(device_path: &str, device_name: &str) -> std::io::Result<()> {
+pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &str) -> std::io::Result<()> {
     /* Open device events with the path that will be sent from main thread */
-    let mut device = Device::open(device_path).expect("Failed to open device");
+    let mut device = Device::open(device_event_path).expect("Failed to open device");
     let mut log_file = OpenOptions::new()
         .create(true)
         .write(true)
@@ -17,13 +18,12 @@ pub fn start_logging(device_path: &str, device_name: &str) -> std::io::Result<()
         .open("logg.txt")?;
     let now = Local::now(); // Gets local time
     let timestamp = now.format("%Y-%m-%d %H:%M:%S").to_string();
-    write!(log_file, "[{}] Starting listening for events on the device with path: {}\n", timestamp, device_path)?;
+    write!(log_file, "[{}] Starting listening for events on the device with path: {}\n", timestamp, device_event_path)?;
     log_file.flush()?;
     println!("[{}] Starting listening for keyboard activities", timestamp);
     let key_map = create_keymap();
     let mut backspace_found: bool = false;
     let mut timestamps: Vec<u128> = Vec::new();
-    let mut run = true;
     let mut speed_test = true;
     'outer: loop {
         for ev in device.fetch_events().expect("Failed to fetch events") {
@@ -54,7 +54,7 @@ pub fn start_logging(device_path: &str, device_name: &str) -> std::io::Result<()
                             let now = Local::now(); // Gets local time
                             let timestamp = now.format("%Y-%m-%d %H:%M:%S").to_string();
                             println!("[{}] \x1b[31mWARNING\x1b[0m  RustGuardian registered BadUSB attack, the device will be unmounted", timestamp);
-                            // Here will be unmounting and closing all processes module
+                            unmount_device(device_path)?;
                             println!("[{}] Device was succesfully removed", timestamp);
                             break 'outer;
                         }
@@ -80,6 +80,22 @@ pub fn start_logging(device_path: &str, device_name: &str) -> std::io::Result<()
             }
         }
     }
+    Ok(())
+}
+
+
+fn unmount_device(sysfs_device_path: &str) -> std::io::Result<()> {
+    // Путь к файлу /sys/bus/usb/devices/2-1/authorized
+    let authorized_file = format!("/sys/bus/usb/devices/{}/authorized", sysfs_device_path);
+
+    // Записываем "0", чтобы отключить питание
+    let mut file = OpenOptions::new()
+        .write(true)
+        .open(&authorized_file)?;
+
+    file.write_all(b"0")?;
+
+    println!("Power off for {} device (authorized=0)", sysfs_device_path);
     Ok(())
 }
 
