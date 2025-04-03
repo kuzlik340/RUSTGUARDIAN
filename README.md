@@ -28,12 +28,12 @@
 
 ## Introduction
 
-The goal of this project is to develop a lightweight USB antivirus with a **CLI interface** that will check USB devices for malicious activity.
+The goal of this project is to develop a lightweight antivirus with a **CLI interface** that will check USB devices for malicious activity and also processes that are currently running in OS.
 Basically, this project solves a problem with the badUSB attacks and USB-based malware infections that are quite popular nowadays.
 
 The project consists of two main components:
 
-1. **Application Core** – In SafeConnection mode, this module monitors all USB device connections and disconnections, comparing each device against a whitelist. If a device is not on the whitelist, it is automatically blocked (users can unblock it via the CLI). In LockDown mode, the module creates a sandbox for each HID device, analyzing input for unusual behavior and scanning all files on mountable volumes by sending file hashes to the VirusTotal API. If any malicious file is detected, the device is automatically blocked.
+1. **Application Core** – In SafeConnection mode, this module monitors all USB device connections and disconnections, comparing each device against a whitelist. If a device is not on the whitelist, it is automatically blocked (users can unblock it via the CLI). In LockDown mode, scanns all files on mountable volumes by sending file hashes to the VirusTotal API, also it will scan some binary documents of processes that are currently running if they will look strange.
 
 2. **CLI interface** – This component provides a **CLI interface** along with **real-time notifications** when a potentially malicious activity is detected.
 
@@ -42,16 +42,17 @@ Through this project, we will get experience with Rust’s memory safety feature
 ## Requirements
 ### The **Application Core** itself will provide:
 1) Multiple operating modes:
-- **LockDown mode**, which creates a sandbox for HID devices that are not listed in the whitelist.
+- **LockDown mode**, which will check the operational system for suspicious processes and binaries and also will check mountable devices.
 - **SafeConnection mode**, which checks whether the connected device is present in the whitelist and blocks it if not.
-- **Background daemons** – Threads responsible for managing the sandbox environment and monitoring the commands sent by HID devices.
+- **Background daemons** – Threads responsible for monitoring processes and USB connections.
 
 2) Behavior analysis and response:
 - Monitors the behavior of all connected devices.
 - Automatically disconnects devices and sends a notification if malicious activity is suspected or if a malicious file is detected on a mountable volume.
+- Automatically kills the process if the process is malicious and also sends a notification with the path to the binary of the process.
 
 ### The CLI module will provide:
-1) Device Logs - shows the exact time of the event, the hardware component involved (e.g., USB port, storage controller), details from the system about the detected device.
+1) Logs - shows the exact time of the event, the hardware component involved (e.g., USB port, storage controller), details from the system about the detected device. Also shows the exact time if a suspicious process was found. 
 2) Safe Devices List – shows user-approved devices that won’t be tracked as unrecognized.
 3) Commands Space - an interactive input area where users can enter commands to control and manage devices.
 
@@ -132,11 +133,12 @@ crossterm = "0.27"
 ```
 
 # TODO - section for team
-- [ ] KeyLogger - will be logging all keyboard events and will allow something to run from keyboard only if it is safe. (Assigned to Kuzin)
-- [ ] Speed checker - BadUSB will input all comands very fast, we have to check the speed of symbols written into terminal (Assigned to Kuzin)
+- [ ] KeyLogger - will be logging all keyboard events. (Assigned to Kuzin)
+- [ ] Speed checker - BadUSB will input all comands very fast, we have to check the speed of symbols written into terminal. (Assigned to Kuzin)
 - [ ] CLI - create a CLI that will check the commands in command space and will print out logs (Assigned to Zinmitski)
-- [ ] Create white-list functions (Asigned to Zimnitski)
-- [ ] Run through files on mountable volume and create hashes of files (Assigned to Zimnitski)
-- [ ] Connect VirusTotal API and check hash of files (Assigned to Kuzin)
-- [ ] Notification mechanism - create a system that will notify user if something goes wrong (Assigned to Zinmitski)
-- [ ] Create list of unsecure commands from keyboard (Asigned to both)
+- [ ] Create white-list functions. (Asigned to Zimnitski)
+- [ ] Run through files on mountable volume and create hashes of files. (Assigned to Zimnitski)
+- [ ] Connect VirusTotal API and check hash of files. (Assigned to Kuzin)
+- [ ] Notification mechanism - create a system that will notify user if something goes wrong. (Assigned to Zinmitski)
+- [ ] Create a module which will go through processes to find malicious software. (Assigned to both)
+- [ ] Create daemons for the corresponding modules of antivirus. (Assigned to both)
