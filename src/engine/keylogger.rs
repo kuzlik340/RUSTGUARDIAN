@@ -5,10 +5,16 @@ use std::fs::OpenOptions;
 use std::os::unix::fs::OpenOptionsExt;
 use std::io::{Write};
 use chrono::Local;
-use std::process::Command;
+
+
+fn map_evdev_key_to_inputlinux(key: evdev::Key) -> Option<input_linux::Key> {
+    input_linux::Key::iter().find(|k| k.code() == key.code())
+}
+
 
 pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &str) -> std::io::Result<()> {
     /* Open device events with the path that will be sent from main thread */
+    println!("ALl charactertsitics of device: {} {} {}", device_event_path, device_path, device_name);
     let mut device = Device::open(device_event_path).expect("Failed to open device");
     let mut log_file = OpenOptions::new()
         .create(true)
@@ -29,6 +35,7 @@ pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &s
         for ev in device.fetch_events().expect("Failed to fetch events") {
             if let InputEventKind::Key(key) = ev.kind() {
                 if ev.value() == 1 { //check разница между всеми нажатиями
+
                     let now = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .expect("Time went backwards")
@@ -98,6 +105,9 @@ fn unmount_device(sysfs_device_path: &str) -> std::io::Result<()> {
     println!("Power off for {} device (authorized=0)", sysfs_device_path);
     Ok(())
 }
+
+
+
 
 /* Hashmap to write the text as user inputs it */
 fn create_keymap() -> HashMap<Key, &'static str> {

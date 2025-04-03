@@ -4,8 +4,22 @@ mod engine;
 use udev::{MonitorBuilder, EventType};
 use engine::keylogger;
 use std::thread;
-use std::borrow::Cow;
 use std::path::PathBuf;
+use std::io::{self, Write};
+use std::os::unix::io::AsRawFd;
+
+
+use std::time::Duration;
+const EVIOCGRAB: u64 = 1074021776;
+const EV_SYN: u16 = 0x00;
+const EV_KEY: u16 = 0x01;
+const SYN_REPORT: u16 = 0;
+
+
+use std::process::Command;
+use std::thread::sleep;
+
+
 fn main() -> std::io::Result<()> {
     let mut monitor = MonitorBuilder::new()?.listen()?; // Create a monitor for monitoring events on all input devices
     println!("Starting RustGuardian, waiting for new devices...");
@@ -20,6 +34,10 @@ fn main() -> std::io::Result<()> {
                         let mut name_str: String = String::from("NULL");
                         if let Some(name) = device.property_value("NAME") {
                             name_str = name.to_string_lossy().into_owned();
+                            if name_str.contains("Virtual") {
+                                continue; // Пропускаем свою же виртуальную клаву
+                            }
+
                             println!("Device name: {}", name_str);
                         }
                         let mut dev_identificator: String = String::from("NULL");
@@ -41,20 +59,32 @@ fn main() -> std::io::Result<()> {
                             }
                         }
 
-
                         if let Some(devnode) = device.devnode() {
+
                             if devnode.to_str().map(|s| s.contains("/dev/input")).unwrap_or(false) {
                                 println!("Main keyboard device event: {}", devnode.display());
                             }
 
 
+
+
                             let devnode_str = devnode.to_str().unwrap().to_string();
                             // Start logging in a new thread
-                            thread::spawn(move || {
-                                if let Err(e) = keylogger::start_logging(&devnode_str, &dev_identificator, &name_str) {
-                                    eprintln!("Error in keylogger: {}", e);
-                                }
-                            });
+
+
+                            // передаём в логгер
+                                thread::spawn(move || {
+                                    if let Err(e) = keylogger::start_logging(&devnode_str, &dev_identificator, &name_str) {
+                                        eprintln!("Error in keylogger: {}", e);
+                                    }
+                                });
+
+
+
+
+
+
+
 
                         }
                     }
@@ -62,6 +92,16 @@ fn main() -> std::io::Result<()> {
             }
         }
     }
+    sleep(Duration::from_millis(30000));
+    Ok(())
 }
+
+
+
+
+
+
+
+
 
 
