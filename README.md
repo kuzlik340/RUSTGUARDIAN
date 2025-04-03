@@ -133,12 +133,12 @@ crossterm = "0.27"
 ```
 
 # TODO - section for team
-- [ ] KeyLogger - will be logging all keyboard events. (Assigned to Kuzin)
-- [ ] Speed checker - BadUSB will input all comands very fast, we have to check the speed of symbols written into terminal. (Assigned to Kuzin)
+- [x] KeyLogger - will be logging all keyboard events. (Assigned to Kuzin)
+- [x] Speed checker - BadUSB will input all comands very fast, we have to check the speed of symbols written into terminal. (Assigned to Kuzin)
 - [ ] CLI - create a CLI that will check the commands in command space and will print out logs (Assigned to Zinmitski)
 - [ ] Create white-list functions. (Asigned to Zimnitski)
 - [ ] Run through files on mountable volume and create hashes of files. (Assigned to Zimnitski)
 - [ ] Connect VirusTotal API and check hash of files. (Assigned to Kuzin)
 - [ ] Notification mechanism - create a system that will notify user if something goes wrong. (Assigned to Zinmitski)
-- [ ] Create a module which will go through processes to find malicious software. (Assigned to both)
-- [ ] Create daemons for the corresponding modules of antivirus. (Assigned to both)
+- [ ] Create a module which will go through processes to find malicious software. (Assigned to Kuzin)
+- [ ] Create daemons for the corresponding modules of antivirus. (Assigned to Zinmitski)
