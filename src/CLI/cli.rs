@@ -9,6 +9,7 @@ use std::{
     sync::mpsc,
     thread,
     time::{Duration, Instant},
+    collections::HashSet,
 };
 use tui::{
     backend::CrosstermBackend,
@@ -25,15 +26,25 @@ enum Event<I> {
     Tick,
 }
 
+// Whitelist implementation
+fn create_whitelist() -> HashSet<String> {
+    let mut whitelist = HashSet::new();
+    whitelist.insert("QEMU USB HARDDRIVE".to_string());
+    whitelist.insert("Generic Keyboard 1234".to_string());
+    whitelist
+}
+
+fn is_device_whitelisted(device_name: &str, whitelist: &HashSet<String>) -> bool {
+    whitelist.contains(device_name)
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    // Enable raw mode (disable input buffering and echo)
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?; // Switch to alternate screen (fullscreen mode)
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // Create a channel to receive input or tick events
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
         let tick_rate = Duration::from_millis(250);
@@ -54,7 +65,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    // Predefined log messages (can be updated later)
     let mut logs = vec![
         "[2.433949] usb 1-4.1 Product: QEMU USB HARDDRIVE",
         "[2.433950] usb 1-4.1 Manufacturer: QEMU",
@@ -65,22 +75,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map(|s| s.to_string())
         .collect::<Vec<_>>();
 
-    // Fake list of devices
-    let devices = vec![
-        "sr0     11:0     1  1024M  rom",
-        "vda     254:0    0  64G    disk",
-        "├─vda1  254:1    0  512M   part /boot/efi",
-        "├─vda2  254:2    0  62.5G  part /",
-        "└─vda3  254:3    0  976M   part [SWAP]",
-    ]
-        .iter()
-        .map(|s| s.to_string())
-        .collect::<Vec<_>>();
+    let mut input = String::new();
 
-    let mut input = String::new(); // User input buffer for command entry
+    // Initialize whitelist
+    let whitelist = create_whitelist();
+    let test_device = "QEMU USB HARDDRIVE";
+    if is_device_whitelisted(test_device, &whitelist) {
+        logs.push(format!("[INFO] Device '{}' is whitelisted", test_device));
+    } else {
+        logs.push(format!("[WARNING] Device '{}' is NOT whitelisted", test_device));
+    }
+
+    // Convert whitelist into a displayable Vec<String>
+    let devices = whitelist.iter().cloned().collect::<Vec<_>>();
 
     loop {
-        // Main TUI drawing block
         terminal.draw(|f| {
             let size = f.size();
             let chunks = Layout::default()
@@ -94,7 +103,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .constraints([Constraint::Min(10), Constraint::Length(3)])
                 .split(chunks[0]);
 
-            // Device logs panel
             let log_text = logs
                 .iter()
                 .map(|l| Spans::from(Span::raw(l)))
@@ -102,47 +110,43 @@ fn main() -> Result<(), Box<dyn Error>> {
             let log_block = Paragraph::new(log_text)
                 .block(Block::default().title("Device logs").borders(Borders::ALL));
 
-            // Command input panel
             let command_block = Paragraph::new(input.as_ref())
                 .block(Block::default().title("Commands").borders(Borders::ALL));
 
-            // Safe devices panel
             let device_text = devices
                 .iter()
                 .map(|l| Spans::from(Span::raw(l)))
                 .collect::<Vec<_>>();
             let device_block = Paragraph::new(device_text)
-                .block(Block::default().title("Safe devices").borders(Borders::ALL));
+                .block(Block::default().title("Safe devices (Whitelist)").borders(Borders::ALL));
 
             f.render_widget(log_block, vertical_chunks[0]);
             f.render_widget(command_block, vertical_chunks[1]);
             f.render_widget(device_block, chunks[1]);
         })?;
 
-        // Handle user input or tick events
         match rx.recv()? {
             Event::Input(event) => match event.code {
                 KeyCode::Char(c) => {
-                    input.push(c); // Add character to command input
+                    input.push(c);
                 }
                 KeyCode::Backspace => {
-                    input.pop(); // Remove last character
+                    input.pop();
                 }
                 KeyCode::Enter => {
-                    logs.push(format!("> {}", input)); // Append command to log panel
+                    logs.push(format!("> {}", input));
                     if input.trim() == ":q" || input.trim() == "exit" {
-                        break; // Exit program
+                        break;
                     }
                     input.clear();
                 }
-                KeyCode::Esc => break, // Exit on Esc
+                KeyCode::Esc => break,
                 _ => {}
             },
-            Event::Tick => {} // Can be used to update dynamic content
+            Event::Tick => {}
         }
     }
 
-    // Cleanup: restore terminal state
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
