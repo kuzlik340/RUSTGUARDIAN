@@ -1,3 +1,6 @@
+use whitelist::{create_whitelist_from_connected_devices, is_device_whitelisted};
+
+
 // Crossterm for terminal control and input events
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event as CEvent, KeyCode},
@@ -7,7 +10,6 @@ use crossterm::{
 
 // Standard library imports
 use std::{
-    collections::HashSet,
     error::Error,
     io,
     sync::mpsc,
@@ -25,6 +27,8 @@ use tui::{
     Terminal,
 };
 
+pub mod whitelist;
+
 // Custom event enum: either keyboard input or timer tick
 enum Event<I> {
     Input(I),
@@ -35,47 +39,6 @@ enum Event<I> {
 enum Focus {
     Logs,
     Whitelist,
-}
-
-// Creates a whitelist of allowed device names
-fn create_whitelist() -> HashSet<String> {
-    let mut whitelist = HashSet::new();
-    whitelist.insert("QEMU USB HARDDRIVE".to_string());
-    whitelist.insert("Generic Keyboard 1234".to_string());
-    whitelist.insert("Generic Keyd 1234".to_string());
-    whitelist.insert("Logitech USB Optical Mouse".to_string());
-    whitelist.insert("SanDisk Ultra USB 3.0".to_string());
-    whitelist.insert("Corsair Gaming K55 Keyboard".to_string());
-    whitelist.insert("WD My Passport 2626".to_string());
-    whitelist.insert("Razer DeathAdder Elite".to_string());
-    whitelist.insert("Kingston DataTraveler 3.0".to_string());
-    whitelist.insert("Dell USB Keyboard".to_string());
-    whitelist.insert("Microsoft Comfort Mouse 4500".to_string());
-    whitelist.insert("Transcend JetFlash 790K".to_string());
-    whitelist.insert("Seagate Backup Plus Slim".to_string());
-    whitelist.insert("HP X500 Wired Mouse".to_string());
-    whitelist.insert("A4Tech USB Keyboard".to_string());
-    whitelist.insert("ADATA UV128 USB Drive".to_string());
-    whitelist.insert("Verbatim Store 'n' Go".to_string());
-    whitelist.insert("SteelSeries Apex Pro Keyboard".to_string());
-    whitelist.insert("ASUS USB-BT400 Bluetooth Adapter".to_string());
-    whitelist.insert("Thrustmaster USB Joystick".to_string());
-    whitelist.insert("Toshiba TransMemory".to_string());
-    whitelist.insert("Logitech Unifying Receiver".to_string());
-    whitelist.insert("Anker USB-C Hub".to_string());
-    whitelist.insert("Ugreen Card Reader".to_string());
-    whitelist.insert("Lenovo ThinkPad Compact USB Keyboard".to_string());
-    whitelist.insert("HyperX Alloy FPS Pro".to_string());
-    whitelist.insert("Cooler Master Devastator".to_string());
-    whitelist.insert("Buffalo External HDD".to_string());
-    whitelist.insert("Wacom Intuos Tablet".to_string());
-    whitelist.insert("Intel Compute Stick USB".to_string());
-    whitelist
-}
-
-// Checks if a device is in the whitelist
-fn is_device_whitelisted(device_name: &str, whitelist: &HashSet<String>) -> bool {
-    whitelist.contains(device_name)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -110,7 +73,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     // Initialize whitelist and test device
-    let whitelist = create_whitelist();
+    let whitelist = create_whitelist_from_connected_devices();
     let mut logs = vec![
         "[2.433949] usb 1-4.1 Product: QEMU USB HARDDRIVE",
         "[2.433950] usb 1-4.1 Manufacturer: QEMU",
