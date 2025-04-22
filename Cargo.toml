@@ -11,6 +11,7 @@ input-linux = "0.7.1"
 libc = "0.2.171"
 crossterm = "0.27"
 tui = "0.19"
+notify-rust = "4.6"
 
 [[bin]]
 name = "cli"
