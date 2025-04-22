@@ -92,12 +92,13 @@ sudo apt-get install libssl-dev
 #### Desktop Notifications
 To enable desktop notifications in Unix-based systems, we need to install the notify-rust library. It allows sending system notifications through the DBus notification daemon, which is commonly used in Linux desktop environments.
 ```bash
-sudo apt install libdbus-1-dev
+sudo apt update
+sudo apt install libnotify-bin
 ```
 And add it to the Cargo.toml:
 ```bash
 [dependencies]
-notify-rust = "4.8"
+notify-rust = "4.6"
 ```
 #### Terminal Interaction
 To handle terminal output, text formatting, and user input processing, We will use the **crossterm** library. This library provides essential functions for controlling the terminal, such as handling colored text output, cursor movement, and key event detection.
