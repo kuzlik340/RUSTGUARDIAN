@@ -12,7 +12,12 @@ libc = "0.2.171"
 crossterm = "0.27"
 tui = "0.19"
 notify-rust = "4.6"
+notify = "6.1"
+sha2 = "0.10"
+walkdir = "2.4"
 
 [[bin]]
 name = "cli"
 path = "src/CLI/cli.rs"
+#name = "fileHash"
+#path = "src/CLI/fileHash.rs"

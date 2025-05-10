@@ -1,4 +1,7 @@
 use whitelist::{create_whitelist_from_connected_devices, is_device_whitelisted};
+use fileHash::hash_all_files_in_dir;
+use std::path::PathBuf;
+use std::fs;
 use notify_rust::Notification;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event as CEvent, KeyCode},
@@ -13,6 +16,7 @@ use std::{
     sync::mpsc,
     thread,
     time::{Duration, Instant},
+    path::Path
 };
 use tui::{
     backend::CrosstermBackend,
@@ -24,6 +28,7 @@ use tui::{
 };
 
 pub mod whitelist;
+mod fileHash;
 
 enum Event<I> {
     Input(I),
@@ -35,12 +40,25 @@ enum Focus {
     Whitelist,
 }
 
+fn folders(dir: &Path) -> Result<Vec<PathBuf>, io::Error> {
+    Ok(fs::read_dir(dir)?
+        .into_iter()
+        .filter(|r| r.is_ok()) // Get rid of Err variants for Result<DirEntry>
+        .map(|r| r.unwrap().path()) // This is safe, since we only have the Ok variants
+        .filter(|r| r.is_dir()) // Filter out non-folders
+        .collect())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+
+    let mut pending_mounts: HashSet<String> = HashSet::new();
+    let mut scanned_paths: HashSet<PathBuf> = HashSet::new();
+
 
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
@@ -215,6 +233,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 for device in &current_devices {
                     if !known_devices.contains(device) {
                         logs.push(format!("[NEW DEVICE] {}", device));
+                        pending_mounts.insert(device.clone());
+
                         if !whitelist.contains(device) {
                             logs.push(format!("[ALERT] Unknown device '{}' connected!", device));
                             Notification::new()
@@ -228,8 +248,25 @@ fn main() -> Result<(), Box<dyn Error>> {
                         }
                     }
                 }
+
+                if let Ok(entries) = folders(Path::new("/media/debian")) {
+                    for path in entries {
+                        if !scanned_paths.contains(&path) {
+                            logs.push(format!("[MOUNT DETECTED] {:?}", path));
+                            let hashes = hash_all_files_in_dir(&path);
+                            for (file, hash) in hashes {
+                                logs.push(format!("[HASH] {} \n => {}", file, hash));
+                            }
+                            scanned_paths.insert(path);
+                        }
+                    }
+                } else {
+                    logs.push("[INFO] No devices in /media/debian yet".to_string());
+                }
+
                 known_devices = current_devices;
             }
+
         }
     }
 
