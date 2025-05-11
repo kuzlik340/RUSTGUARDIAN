@@ -2,25 +2,31 @@ use std::{fs, path::Path};
 use walkdir::WalkDir;
 use sha2::{Sha256, Digest};
 
+/// Computes the SHA-256 hash of a single file at the given path.
+/// Returns the hexadecimal string representation of the hash.
 fn hash_file(path: &Path) -> Option<String> {
-    let data = fs::read(path).ok()?;
-    let mut hasher = Sha256::new();
-    hasher.update(&data);
-    let result = hasher.finalize();
-    Some(format!("{:x}", result))
+    let data = fs::read(path).ok()?; // Read file contents
+    let mut hasher = Sha256::new(); // Create SHA-256 hasher
+    hasher.update(&data); // Feed file data into the hasher
+    let result = hasher.finalize(); // Finalize and get the hash
+    Some(format!("{:x}", result)) // Return hash as hex string
 }
 
+/// Recursively walks through all files in the given directory,
+/// computes SHA-256 hash for each file, and returns a vector of (file_path, hash) pairs.
 pub fn hash_all_files_in_dir(dir: &Path) -> Vec<(String, String)> {
     let mut hashes = Vec::new();
+    // Walk through directory recursively
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         if path.is_file() {
+            // Read and hash the file
             if let Ok(data) = fs::read(path) {
                 let mut hasher = Sha256::new();
                 hasher.update(&data);
                 let result = hasher.finalize();
                 let hash_str = format!("{:x}", result);
-                hashes.push((path.display().to_string(), hash_str));
+                hashes.push((path.display().to_string(), hash_str)); // Store file path and hash
             }
         }
     }

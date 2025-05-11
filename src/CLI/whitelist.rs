@@ -2,18 +2,23 @@ use std::collections::HashSet;
 use std::process::Command;
 use notify_rust::Notification;
 
-// Keep track of already notified devices (once per session)
+/// Global static variable to track already notified devices within this session.
+/// Unsafe is required because mutable static variables can lead to data races.
 static mut ALREADY_NOTIFIED: Option<HashSet<String>> = None;
 
+/// Creates a whitelist of currently connected USB devices using `lsusb`.
+/// For each new device detected (based on its unique ID), a desktop notification is shown.
+/// Returns a HashSet of device names.
 pub fn create_whitelist_from_connected_devices() -> HashSet<String> {
     let mut whitelist = HashSet::new();
 
+    // Run `lsusb` command to list connected USB devices
     if let Ok(output) = Command::new("lsusb").output() {
         if let Ok(stdout) = String::from_utf8(output.stdout) {
             for line in stdout.lines() {
-                let unique_id = line.trim().to_string(); // Use full line to be unique
+                let unique_id = line.trim().to_string(); // Use the full line as a unique device ID
 
-                // Clean up device description (more readable)
+                // Extract device description from the line (after "ID ...")
                 let device_name = line
                     .split("ID")
                     .nth(1)
@@ -23,7 +28,7 @@ pub fn create_whitelist_from_connected_devices() -> HashSet<String> {
                 if !device_name.is_empty() {
                     whitelist.insert(device_name.clone());
 
-                    // Notify only if not already notified
+                    // Show notification only if this device hasn't been notified yet
                     unsafe {
                         let notified = ALREADY_NOTIFIED.get_or_insert(HashSet::new());
                         if !notified.contains(&unique_id) {
@@ -45,6 +50,7 @@ pub fn create_whitelist_from_connected_devices() -> HashSet<String> {
     whitelist
 }
 
+/// Checks if a given device name is present in the whitelist.
 pub fn is_device_whitelisted(device_name: &str, whitelist: &HashSet<String>) -> bool {
     whitelist.contains(device_name)
 }

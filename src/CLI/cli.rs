@@ -16,7 +16,7 @@ use std::{
     sync::mpsc,
     thread,
     time::{Duration, Instant},
-    path::Path
+    path::Path,
 };
 use tui::{
     backend::CrosstermBackend,
@@ -40,26 +40,28 @@ enum Focus {
     Whitelist,
 }
 
+/// Returns a list of subdirectories in the given directory
 fn folders(dir: &Path) -> Result<Vec<PathBuf>, io::Error> {
     Ok(fs::read_dir(dir)?
         .into_iter()
-        .filter(|r| r.is_ok()) // Get rid of Err variants for Result<DirEntry>
-        .map(|r| r.unwrap().path()) // This is safe, since we only have the Ok variants
-        .filter(|r| r.is_dir()) // Filter out non-folders
+        .filter(|r| r.is_ok())
+        .map(|r| r.unwrap().path())
+        .filter(|r| r.is_dir())
         .collect())
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    enable_raw_mode()?;
+    enable_raw_mode()?; // Enable raw terminal mode
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
+    // Keep track of devices waiting for mount and already scanned paths
     let mut pending_mounts: HashSet<String> = HashSet::new();
     let mut scanned_paths: HashSet<PathBuf> = HashSet::new();
 
-
+    // Input + tick handling channel
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
         let tick_rate = Duration::from_millis(1000);
@@ -80,12 +82,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
+    // Initialize whitelist and connected devices
     let whitelist = create_whitelist_from_connected_devices();
     let mut known_devices = create_whitelist_from_connected_devices();
 
-    let mut logs = vec![
-        "[INFO] USB Device Monitor Started",
-    ]
+    // Log startup info and unrecognized devices
+    let mut logs = vec!["[INFO] USB Device Monitor Started"]
         .iter()
         .map(|s| s.to_string())
         .collect::<Vec<_>>();
@@ -104,14 +106,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-
-    let mut logs = vec![
-        "[INFO] USB Device Monitor Started",
-    ]
-        .iter()
-        .map(|s| s.to_string())
-        .collect::<Vec<_>>();
-
     let devices = whitelist.iter().cloned().collect::<Vec<_>>();
     let mut input = String::new();
     let mut scroll_offset: usize = 0;
@@ -120,8 +114,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let max_visible_whitelist: usize = 25;
     let mut focus = Focus::Logs;
 
+    // Main loop
     loop {
         terminal.draw(|f| {
+            // Layout
             let size = f.size();
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
@@ -134,6 +130,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .constraints([Constraint::Min(10), Constraint::Length(3)])
                 .split(chunks[0]);
 
+            // Log display
             let visible_logs = logs
                 .iter()
                 .skip(scroll_offset)
@@ -141,6 +138,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .map(|l| Spans::from(Span::raw(l)))
                 .collect::<Vec<_>>();
 
+            // Whitelist display
             let visible_devices = devices
                 .iter()
                 .skip(whitelist_scroll_offset)
@@ -148,6 +146,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .map(|l| Spans::from(Span::raw(l)))
                 .collect::<Vec<_>>();
 
+            // Log panel
             let log_block = Paragraph::new(visible_logs)
                 .block(Block::default()
                     .title("Device logs")
@@ -158,6 +157,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         Style::default()
                     }));
 
+            // Command panel
             let command_block = Paragraph::new(input.as_ref())
                 .block(Block::default()
                     .title("Commands")
@@ -168,6 +168,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         Style::default()
                     }));
 
+            // Whitelist panel
             let device_block = Paragraph::new(visible_devices)
                 .block(Block::default()
                     .title("Safe devices (Whitelist)")
@@ -196,28 +197,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                     input.clear();
                 }
                 KeyCode::Up => match focus {
-                    Focus::Logs => {
-                        if scroll_offset > 0 {
-                            scroll_offset -= 1;
-                        }
-                    }
-                    Focus::Whitelist => {
-                        if whitelist_scroll_offset > 0 {
-                            whitelist_scroll_offset -= 1;
-                        }
-                    }
+                    Focus::Logs => if scroll_offset > 0 { scroll_offset -= 1; },
+                    Focus::Whitelist => if whitelist_scroll_offset > 0 { whitelist_scroll_offset -= 1; },
                 },
                 KeyCode::Down => match focus {
-                    Focus::Logs => {
-                        if scroll_offset + max_visible_lines < logs.len() {
-                            scroll_offset += 1;
-                        }
-                    }
-                    Focus::Whitelist => {
-                        if whitelist_scroll_offset + max_visible_whitelist < devices.len() {
-                            whitelist_scroll_offset += 1;
-                        }
-                    }
+                    Focus::Logs => if scroll_offset + max_visible_lines < logs.len() { scroll_offset += 1; },
+                    Focus::Whitelist => if whitelist_scroll_offset + max_visible_whitelist < devices.len() {
+                        whitelist_scroll_offset += 1;
+                    },
                 },
                 KeyCode::Tab => {
                     focus = match focus {
@@ -229,6 +216,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 _ => {}
             },
             Event::Tick => {
+                // Detect newly connected devices
                 let current_devices = create_whitelist_from_connected_devices();
                 for device in &current_devices {
                     if !known_devices.contains(device) {
@@ -249,8 +237,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                     }
                 }
 
+                // Try to find mount points under /media/debian
                 if let Ok(entries) = folders(Path::new("/media/debian")) {
                     for path in entries {
+                        // Only hash files if not already scanned
                         if !scanned_paths.contains(&path) {
                             logs.push(format!("[MOUNT DETECTED] {:?}", path));
                             let hashes = hash_all_files_in_dir(&path);
@@ -266,10 +256,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                 known_devices = current_devices;
             }
-
         }
     }
 
+    // Restore terminal state
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
