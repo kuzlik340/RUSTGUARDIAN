@@ -32,13 +32,14 @@ pub fn create_whitelist_from_connected_devices() -> HashSet<String> {
                     unsafe {
                         let notified = ALREADY_NOTIFIED.get_or_insert(HashSet::new());
                         if !notified.contains(&unique_id) {
-                            Notification::new()
+                            if let Err(e) = Notification::new()
                                 .summary("Device Whitelisted")
                                 .body(&format!("Whitelisted device:\n{}", device_name))
                                 .icon("dialog-information")
                                 .show()
-                                .unwrap();
-
+                            {
+                                eprintln!("Failed to show notification: {}", e);
+                            }
                             notified.insert(unique_id);
                         }
                     }

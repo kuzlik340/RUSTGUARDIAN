@@ -1,5 +1,5 @@
-use whitelist::{create_whitelist_from_connected_devices, is_device_whitelisted};
-use fileHash::hash_all_files_in_dir;
+use super::whitelist::{create_whitelist_from_connected_devices, is_device_whitelisted};
+use super::filehash::hash_all_files_in_dir;
 use std::path::PathBuf;
 use std::fs;
 use notify_rust::Notification;
@@ -26,9 +26,9 @@ use tui::{
     widgets::{Block, Borders, Paragraph},
     Terminal,
 };
-
-pub mod whitelist;
-mod fileHash;
+use main::get_logs;
+//pub mod whitelist;
+//mod filehash;
 
 enum Event<I> {
     Input(I),
@@ -50,8 +50,8 @@ fn folders(dir: &Path) -> Result<Vec<PathBuf>, io::Error> {
         .collect())
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    enable_raw_mode()?; // Enable raw terminal mode
+pub fn run_cli() -> Result<(), Box<dyn Error>> {
+    enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
@@ -116,6 +116,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Main loop
     loop {
+        let mut current_logs = get_logs();
+        current_logs.extend(logs.iter().cloned());
+        logs = current_logs;
         terminal.draw(|f| {
             // Layout
             let size = f.size();

@@ -140,6 +140,7 @@ crossterm = "0.27"
 - [x] Create white-list functions. (Asigned to Zimnitski)
 - [x] Run through files on mountable volume and create hashes of files. (Assigned to Zimnitski)
 - [x] Notification mechanism - create a system that will notify user if something goes wrong. (Assigned to Zinmitski)
-- [ ] Connect VirusTotal API and check hash of files. (Assigned to Kuzin)
+- [ ] Create local storage for hashes of viruses and make a logic for updating itself (Assigned to Kuzin)
+- [ ] Connect every module into one (Assigned to Kuzin)
 - [ ] Create a module which will go through processes to find malicious software. (Assigned to Kuzin)
 - [ ] Create daemons for the corresponding modules of antivirus. (Assigned to Zinmitski)

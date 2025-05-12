@@ -5,16 +5,14 @@ use std::fs::OpenOptions;
 use std::os::unix::fs::OpenOptionsExt;
 use std::io::{Write};
 use chrono::Local;
-
-
-fn map_evdev_key_to_inputlinux(key: evdev::Key) -> Option<input_linux::Key> {
-    input_linux::Key::iter().find(|k| k.code() == key.code())
-}
+use crate::push_log;
 
 
 pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &str) -> std::io::Result<()> {
     /* Open device events with the path that will be sent from main thread */
-    println!("ALl charactertsitics of device: {} {} {}", device_event_path, device_path, device_name);
+    let msg = format!("All charactertsitics of device: {} {} {}", device_event_path, device_path, device_name);
+    push_log(msg);
+   // println!("All charactertsitics of device: {} {} {}", device_event_path, device_path, device_name);
     let mut device = Device::open(device_event_path).expect("Failed to open device");
     let mut log_file = OpenOptions::new()
         .create(true)
