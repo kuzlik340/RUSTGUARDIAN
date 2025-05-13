@@ -1,6 +1,7 @@
 use super::whitelist::{create_whitelist_from_connected_devices};
 use super::filehash::{hash_all_files_in_dir, load_hashes_from_file};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use std::fs;
 use notify_rust::Notification;
 use crossterm::{
@@ -26,11 +27,13 @@ use tui::{
     widgets::{Block, Borders, Paragraph},
     Terminal,
 };
+use lazy_static::lazy_static;
 use crate::get_logs;
-use crate::start_find_device;
+use crate::DeviceMonitor;
 use crate::start_hash_checker;
 use chrono::Local;
 use crate::LOGS;
+use crate::push_log;
 
 //pub mod whitelist;
 //mod filehash;
@@ -43,6 +46,26 @@ enum Event<I> {
 enum Focus {
     Logs,
     Whitelist,
+}
+
+lazy_static! {
+    pub static ref LOCKDOWN_MODE: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+}
+
+pub fn enable_lockdown() {
+    let mut mode = LOCKDOWN_MODE.lock().unwrap();
+    *mode = true;
+    push_log("[SECURITY] LockDown mode enabled".to_string());
+}
+
+pub fn disable_lockdown() {
+    let mut mode = LOCKDOWN_MODE.lock().unwrap();
+    *mode = false;
+    push_log("[SECURITY] LockDown mode disabled".to_string());
+}
+
+pub fn is_lockdown_enabled() -> bool {
+    *LOCKDOWN_MODE.lock().unwrap()
 }
 
 /// Returns a list of subdirectories in the given directory
@@ -124,7 +147,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
     let max_visible_lines: usize = 23;
     let max_visible_whitelist: usize = 25;
     let mut focus = Focus::Logs;
-
+    let mut device_monitor = DeviceMonitor::new();
     // Main loop
     loop {
         logs.extend(get_logs());
@@ -207,9 +230,32 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                     if input.trim() == ":q" || input.trim() == "exit" {
                         break;
                     }
-                    if input.trim() == "lockdown" {
-                        start_find_device();
+                    else if input.trim() == "enable LockDown" {
+                        //enable_lockdown();
+                        push_log("[SECURITY] LockDown mode enabled".to_string());
+                        device_monitor.start();
                     }
+                    else if input.trim() == "enable SafeConnection" {
+                        //start_find_device();
+                    }
+                    else if input.trim() == "disable LockDown" {
+                        //disable_lockdown();
+                        device_monitor.stop();
+                        push_log("[SECURITY] LockDown mode disabled".to_string());
+                    }
+                    else if input.trim() == "disable SafeConnection" {
+
+                    }
+                    else if input.trim() == "add device" {
+
+                    }
+                    else if input.trim() == "del device" {
+
+                    }
+                    else if input.trim() == "list device" {
+
+                    }
+
                     input.clear();
                 }
                 KeyCode::Up => match focus {
@@ -245,8 +291,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                                 .summary("USB Device Alert")
                                 .body(&format!("Unknown device connected:\n{}", device))
                                 .icon("dialog-warning")
-                                .show()
-                                .unwrap();
+                                .show(); 
                         } else {
                             push_log(format!("[INFO] Whitelisted device '{}' connected.", device));
                         }
@@ -254,7 +299,12 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                 }
 
                 // Try to find mount points under /media/debian
-                let user_mount_path = format!("/media/{}", std::env::var("USER").unwrap_or_else(|_| "debian".into()));
+                let user_mount_path = format!(
+                    "/media/{}",
+                    std::env::var("SUDO_USER")
+                        .or_else(|_| std::env::var("USER"))
+                        .unwrap_or_else(|_| "debian".to_string())
+                );
                 if let Ok(entries) = folders(Path::new(&user_mount_path)) {
                     for path in entries {
                         // Only hash files if not already scanned

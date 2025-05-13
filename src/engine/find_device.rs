@@ -13,13 +13,15 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
 use crate::push_log;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-
-pub fn find_all_devices() -> std::io::Result<()> {
+pub fn find_all_devices(running: Arc<AtomicBool>) -> std::io::Result<()> {
     let mut monitor = MonitorBuilder::new()?.listen()?; // Create a monitor for monitoring events on all input devices
     //println!("Starting RustGuardian, waiting for new devices...");
     push_log(format!("Starting RustGuardian, waiting for new devices..."));
-    loop {
+    let keyloggers_running = Arc::new(AtomicBool::new(true));
+    let mut keylogger_threads = Vec::new();
+    while running.load(Ordering::Relaxed) {
         if let Some(event) = monitor.iter().next() {
             if event.event_type() == EventType::Add {
                 let device = event.device();
@@ -62,20 +64,32 @@ pub fn find_all_devices() -> std::io::Result<()> {
                             let devnode_str = devnode.to_str().unwrap().to_string();
                             // Start logging in a new thread
 
+                            let keyloggers_running_clone = keyloggers_running.clone();
 
                             // передаём в логгер
-                            thread::spawn(move || {
-                                if let Err(e) = keylogger::start_logging(&devnode_str, &dev_identificator, &name_str) {
+                            let handle = thread::spawn(move || {
+                                if let Err(e) = keylogger::start_logging(&devnode_str, &dev_identificator, &name_str, keyloggers_running_clone) {
                                     eprintln!("Error in keylogger: {}", e);
                                 }
                             });
+                            keylogger_threads.push(handle);
 
                         }
                     }
                 }
             }
         }
+        thread::sleep(Duration::from_millis(10));
     }
-    sleep(Duration::from_millis(30000));
+    keyloggers_running.store(false, Ordering::Relaxed);
+    
+    for handle in keylogger_threads {
+        if let Err(e) = handle.join() {
+            push_log(format!("Failed to join keylogger thread: {:?}", e));
+        }
+    }
+    
+    push_log("Device monitoring stopped".to_string());
+    //sleep(Duration::from_millis(30000));
     Ok(())
 }

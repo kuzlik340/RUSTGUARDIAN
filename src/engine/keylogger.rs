@@ -5,9 +5,11 @@ use std::fs::OpenOptions;
 use std::os::unix::fs::OpenOptionsExt;
 use std::io::{Write};
 use chrono::Local;
+use std::sync::Arc;
 use crate::push_log;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &str) -> std::io::Result<()> {
+pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &str, running: Arc<AtomicBool>) -> std::io::Result<()> {
     /* Open device events with the path that will be sent from main thread */
     let msg = format!("All charactertsitics of device: {} {} {}", device_event_path, device_path, device_name);
     push_log(msg);
@@ -28,11 +30,10 @@ pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &s
     let mut backspace_found: bool = false;
     let mut timestamps: Vec<u128> = Vec::new();
     let mut speed_test = true;
-    'outer: loop {
+    'outer: while running.load(Ordering::Relaxed) {
         for ev in device.fetch_events().expect("Failed to fetch events") {
             if let InputEventKind::Key(key) = ev.kind() {
                 if ev.value() == 1 { //check разница между всеми нажатиями
-
                     let now = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .expect("Time went backwards")
