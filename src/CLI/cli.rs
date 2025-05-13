@@ -1,5 +1,5 @@
 use super::whitelist::{create_whitelist_from_connected_devices};
-use super::filehash::hash_all_files_in_dir;
+use super::filehash::{hash_all_files_in_dir, load_hashes_from_file};
 use std::path::PathBuf;
 use std::fs;
 use notify_rust::Notification;
@@ -28,6 +28,7 @@ use tui::{
 };
 use crate::get_logs;
 use crate::start_find_device;
+use crate::start_hash_checker;
 //pub mod whitelist;
 //mod filehash;
 
@@ -250,10 +251,9 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                         // Only hash files if not already scanned
                         if !scanned_paths.contains(&path) {
                             logs.push(format!("[MOUNT DETECTED] {:?}", path));
-                            let hashes = hash_all_files_in_dir(&path);
-                            for (file, hash) in hashes {
-                                logs.push(format!("[HASH] {} \n => {}", file, hash));
-                            }
+                            
+                            start_hash_checker(&path);
+                            
                             scanned_paths.insert(path);
                         }
                     }

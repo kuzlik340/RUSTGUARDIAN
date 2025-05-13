@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use crate::push_log;
 
-fn load_hashes_from_file(path: &str) -> HashSet<String> {
+pub fn load_hashes_from_file(path: &str) -> HashSet<String> {
     let file = File::open(path).expect("Cannot open hash file");
     let reader = BufReader::new(file);
 
@@ -27,11 +27,12 @@ fn hash_file(path: &Path) -> Option<String> {
     Some(format!("{:x}", result)) // Return hash as hex string
 }
 
+
+
 /// Recursively walks through all files in the given directory,
 /// computes SHA-256 hash for each file, and returns a vector of (file_path, hash) pairs.
-pub fn hash_all_files_in_dir(dir: &Path) -> Vec<(String, String)> {
+pub fn hash_all_files_in_dir(dir: &Path, hash_set: &HashSet<String>) -> Vec<(String, String)> {
     let mut hashes = Vec::new();
-    let hash_set = load_hashes_from_file("/home/timkuz/RUST_PROJECT/RUST_PROJECT/hashes.txt");
 
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
@@ -43,7 +44,7 @@ pub fn hash_all_files_in_dir(dir: &Path) -> Vec<(String, String)> {
                     push_log(format!("File with path: {} is malicious", path.display().to_string() ))
                 }
                 else{
-                    push_log(format!("File with path: {} is good", path.display().to_string() ))
+                    //push_log(format!("File with path: {} is good", path.display().to_string() ))
                 }
             }
         }
