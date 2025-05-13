@@ -244,7 +244,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                 }
 
                 // Try to find mount points under /media/debian
-                if let Ok(entries) = folders(Path::new("/media/debian")) {
+                if let Ok(entries) = folders(Path::new("/media/timkuz")) {
                     for path in entries {
                         // Only hash files if not already scanned
                         if !scanned_paths.contains(&path) {

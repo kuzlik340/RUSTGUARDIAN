@@ -1,6 +1,21 @@
 use std::{fs, path::Path};
 use walkdir::WalkDir;
 use sha2::{Sha256, Digest};
+use std::collections::HashSet;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use crate::push_log;
+
+fn load_hashes_from_file(path: &str) -> HashSet<String> {
+    let file = File::open(path).expect("Cannot open hash file");
+    let reader = BufReader::new(file);
+
+    reader
+        .lines()
+        .filter_map(|line| line.ok())
+        .map(|line| line.trim().to_lowercase()) // удалить пробелы, привести к нижнему регистру
+        .collect()
+}
 
 /// Computes the SHA-256 hash of a single file at the given path.
 /// Returns the hexadecimal string representation of the hash.
@@ -16,12 +31,20 @@ fn hash_file(path: &Path) -> Option<String> {
 /// computes SHA-256 hash for each file, and returns a vector of (file_path, hash) pairs.
 pub fn hash_all_files_in_dir(dir: &Path) -> Vec<(String, String)> {
     let mut hashes = Vec::new();
+    let hash_set = load_hashes_from_file("/home/timkuz/RUST_PROJECT/RUST_PROJECT/hashes.txt");
 
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         if path.is_file() {
             if let Some(hash) = hash_file(path) {
-                hashes.push((path.display().to_string(), hash));
+                let hash_clone = hash.clone(); 
+                hashes.push((path.display().to_string(), hash_clone));
+                if hash_set.contains(&hash) {
+                    push_log(format!("File with path: {} is malicious", path.display().to_string() ))
+                }
+                else{
+                    push_log(format!("File with path: {} is good", path.display().to_string() ))
+                }
             }
         }
     }
