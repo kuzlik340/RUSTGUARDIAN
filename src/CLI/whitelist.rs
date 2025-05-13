@@ -4,52 +4,40 @@ use notify_rust::Notification;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 use crate::push_log;
+use lazy_static::lazy_static;
+use crate::RwLock;
 
-/// Global static variable to track already notified devices within this session.
-/// Unsafe is required because mutable static variables can lead to data races.
-static ALREADY_NOTIFIED: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+/// Tracks which device IDs we've already shown notifications for
+use std::collections::HashMap;
 
-/// Creates a whitelist of currently connected USB devices using `lsusb`.
-/// For each new device detected (based on its unique ID), a desktop notification is shown.
-/// Returns a HashSet of device names.
-pub fn create_whitelist_from_connected_devices() -> HashSet<String> {
-    let mut whitelist = HashSet::new();
+lazy_static! {
+    pub static ref WHITELIST: RwLock<HashMap<String, String>> = RwLock::new(HashMap::new());
+}
 
-    // Run `lsusb` command to list connected USB devices
+
+
+
+/// Scans currently connected USB devices using `lsusb`,
+/// extracts their ID (e.g. 046d:c534), shows notification if not yet shown,
+/// and returns a set of all connected device IDs.
+pub fn create_whitelist_from_connected_devices() -> HashMap<String, String> {
+    let mut devices = HashMap::new();
+
     if let Ok(output) = Command::new("lsusb").output() {
         if let Ok(stdout) = String::from_utf8(output.stdout) {
             for line in stdout.lines() {
-                let unique_id = line.trim().to_string(); // Use the full line as a unique device ID
-
-                // Extract device description from the line (after "ID ...")
-                let device_name = line
-                    .split("ID")
-                    .nth(1)
-                    .map(|s| s.split_whitespace().skip(1).collect::<Vec<_>>().join(" "))
-                    .unwrap_or_else(|| "Unknown Device".into());
-
-                if !device_name.is_empty() {
-                    whitelist.insert(device_name.clone());
-
-                    // Show notification only if this device hasn't been notified yet
-                    let mut notified = ALREADY_NOTIFIED.lock().unwrap();
-                    if !notified.contains(&unique_id) {
-                        if let Err(e) = Notification::new()
-                            .summary("Device Whitelisted")
-                            .body(&format!("Whitelisted device:\n{}", device_name))
-                            .icon("dialog-information")
-                            .show()
-                        {
-                            push_log(format!("Failed to show notification: {}", e));
-            
-                        }
-                        notified.insert(unique_id);
+                if let Some(id_part) = line.split("ID").nth(1) {
+                    let mut parts = id_part.trim().split_whitespace();
+                    let id = parts.next().unwrap_or("unknown").to_string();
+                    let name = parts.collect::<Vec<_>>().join(" ");
+                    if !id.is_empty() {
+                        devices.insert(id, name);
                     }
                 }
             }
         }
     }
 
-    whitelist
+    devices
 }
 

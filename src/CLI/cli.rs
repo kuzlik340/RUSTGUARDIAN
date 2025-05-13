@@ -1,4 +1,4 @@
-use super::whitelist::{create_whitelist_from_connected_devices};
+use super::whitelist::create_whitelist_from_connected_devices;
 use super::filehash::{hash_all_files_in_dir, load_hashes_from_file};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -27,16 +27,12 @@ use tui::{
     widgets::{Block, Borders, Paragraph},
     Terminal,
 };
-use lazy_static::lazy_static;
 use crate::get_logs;
 use crate::DeviceMonitor;
 use crate::start_hash_checker;
-use chrono::Local;
-use crate::LOGS;
 use crate::push_log;
+use crate::WHITELIST;
 
-//pub mod whitelist;
-//mod filehash;
 
 enum Event<I> {
     Input(I),
@@ -48,40 +44,12 @@ enum Focus {
     Whitelist,
 }
 
-lazy_static! {
-    pub static ref LOCKDOWN_MODE: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
-}
-
-pub fn enable_lockdown() {
-    let mut mode = LOCKDOWN_MODE.lock().unwrap();
-    *mode = true;
-    push_log("[SECURITY] LockDown mode enabled".to_string());
-}
-
-pub fn disable_lockdown() {
-    let mut mode = LOCKDOWN_MODE.lock().unwrap();
-    *mode = false;
-    push_log("[SECURITY] LockDown mode disabled".to_string());
-}
-
-pub fn is_lockdown_enabled() -> bool {
-    *LOCKDOWN_MODE.lock().unwrap()
-}
-
-/// Returns a list of subdirectories in the given directory
-fn folders(dir: &Path) -> Result<Vec<PathBuf>, io::Error> {
+pub fn folders(dir: &Path) -> Result<Vec<PathBuf>, io::Error> {
     Ok(fs::read_dir(dir)?
-        .into_iter()
-        .filter(|r| r.is_ok())
-        .map(|r| r.unwrap().path())
+        .filter_map(Result::ok)
+        .map(|r| r.path())
         .filter(|r| r.is_dir())
         .collect())
-}
-
-pub fn push_log(msg: String) {
-    let mut logs = LOGS.lock().unwrap();
-    let timestamp = Local::now().format("[%H:%M:%S]").to_string();
-    logs.push(format!("{} {}", timestamp, msg));
 }
 
 pub fn run_cli() -> Result<(), Box<dyn Error>> {
@@ -91,19 +59,15 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // Keep track of devices waiting for mount and already scanned paths
     let mut pending_mounts: HashSet<String> = HashSet::new();
     let mut scanned_paths: HashSet<PathBuf> = HashSet::new();
 
-    // Input + tick handling channel
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
         let tick_rate = Duration::from_millis(1000);
         let mut last_tick = Instant::now();
         loop {
-            let timeout = tick_rate
-                .checked_sub(last_tick.elapsed())
-                .unwrap_or_else(|| Duration::from_secs(0));
+            let timeout = tick_rate.checked_sub(last_tick.elapsed()).unwrap_or_default();
             if event::poll(timeout).unwrap() {
                 if let CEvent::Key(key) = event::read().unwrap() {
                     let _ = tx.send(Event::Input(key));
@@ -116,31 +80,30 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    // Initialize whitelist and connected devices
-    let whitelist = create_whitelist_from_connected_devices();
-    let mut known_devices = create_whitelist_from_connected_devices();
+    // Use global whitelist
+    let mut known_devices: HashSet<String> = {
+        let whitelist = WHITELIST.read().unwrap();
+        whitelist.keys().cloned().collect()
+    };
+    
 
-    // Log startup info and unrecognized devices
-    let mut logs = vec!["[INFO] USB Device Monitor Started"]
-        .iter()
-        .map(|s| s.to_string())
-        .collect::<Vec<_>>();
+    let mut logs = vec!["[INFO] USB Device Monitor Started".to_string()];
 
     for device in &known_devices {
-        if !whitelist.contains(device) {
+        let whitelist = WHITELIST.read().unwrap();
+        if !whitelist.contains_key(device) {
             push_log(format!("[ALERT] Unrecognized device on startup: '{}'", device));
             Notification::new()
                 .summary("USB Device Warning")
                 .body(&format!("Unrecognized device detected at startup:\n{}", device))
                 .icon("dialog-warning")
                 .show()
-                .unwrap();
+                .ok();
         } else {
             push_log(format!("[INFO] Whitelisted device on startup: '{}'", device));
         }
     }
 
-    let devices = whitelist.iter().cloned().collect::<Vec<_>>();
     let mut input = String::new();
     let mut scroll_offset: usize = 0;
     let mut whitelist_scroll_offset: usize = 0;
@@ -148,11 +111,20 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
     let max_visible_whitelist: usize = 25;
     let mut focus = Focus::Logs;
     let mut device_monitor = DeviceMonitor::new();
-    // Main loop
+
     loop {
         logs.extend(get_logs());
+        let whitelist_vec = {
+            let wl = WHITELIST.read().unwrap();
+            wl.iter()
+                .map(|(id, name)| format!("[{}] {}", id, name))
+                .collect::<Vec<String>>()
+        };
+        
+        
+        
+
         terminal.draw(|f| {
-            // Layout
             let size = f.size();
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
@@ -165,7 +137,6 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                 .constraints([Constraint::Min(10), Constraint::Length(3)])
                 .split(chunks[0]);
 
-            // Log display
             let visible_logs = logs
                 .iter()
                 .skip(scroll_offset)
@@ -173,15 +144,13 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                 .map(|l| Spans::from(Span::raw(l)))
                 .collect::<Vec<_>>();
 
-            // Whitelist display
-            let visible_devices = devices
+            let visible_devices = whitelist_vec
                 .iter()
                 .skip(whitelist_scroll_offset)
                 .take(max_visible_whitelist)
                 .map(|l| Spans::from(Span::raw(l)))
                 .collect::<Vec<_>>();
 
-            // Log panel
             let log_block = Paragraph::new(visible_logs)
                 .block(Block::default()
                     .title("Device logs")
@@ -191,9 +160,8 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                     } else {
                         Style::default()
                     }))
-                    .wrap(Wrap { trim: true });;
+                .wrap(Wrap { trim: true });
 
-            // Command panel
             let command_block = Paragraph::new(input.as_ref())
                 .block(Block::default()
                     .title("Commands")
@@ -204,7 +172,6 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                         Style::default()
                     }));
 
-            // Whitelist panel
             let device_block = Paragraph::new(visible_devices)
                 .block(Block::default()
                     .title("Safe devices (Whitelist)")
@@ -230,32 +197,6 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                     if input.trim() == ":q" || input.trim() == "exit" {
                         break;
                     }
-                    else if input.trim() == "enable LockDown" {
-                        //enable_lockdown();
-                        push_log("[SECURITY] LockDown mode enabled".to_string());
-                        device_monitor.start();
-                    }
-                    else if input.trim() == "enable SafeConnection" {
-                        //start_find_device();
-                    }
-                    else if input.trim() == "disable LockDown" {
-                        //disable_lockdown();
-                        device_monitor.stop();
-                        push_log("[SECURITY] LockDown mode disabled".to_string());
-                    }
-                    else if input.trim() == "disable SafeConnection" {
-
-                    }
-                    else if input.trim() == "add device" {
-
-                    }
-                    else if input.trim() == "del device" {
-
-                    }
-                    else if input.trim() == "list device" {
-
-                    }
-
                     input.clear();
                 }
                 KeyCode::Up => match focus {
@@ -264,7 +205,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                 },
                 KeyCode::Down => match focus {
                     Focus::Logs => if scroll_offset + max_visible_lines < logs.len() { scroll_offset += 1; },
-                    Focus::Whitelist => if whitelist_scroll_offset + max_visible_whitelist < devices.len() {
+                    Focus::Whitelist => if whitelist_scroll_offset + max_visible_whitelist < whitelist_vec.len() {
                         whitelist_scroll_offset += 1;
                     },
                 },
@@ -278,27 +219,27 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                 _ => {}
             },
             Event::Tick => {
-                // Detect newly connected devices
+                // Сканируем подключенные устройства: HashMap<ID, Name>
                 let current_devices = create_whitelist_from_connected_devices();
-                for device in &current_devices {
-                    if !known_devices.contains(device) {
-                        push_log(format!("[NEW DEVICE] {}", device));
-                        pending_mounts.insert(device.clone());
-
-                        if !whitelist.contains(device) {
-                            push_log(format!("[ALERT] Unknown device '{}' connected!", device));
-                            Notification::new()
-                                .summary("USB Device Alert")
-                                .body(&format!("Unknown device connected:\n{}", device))
-                                .icon("dialog-warning")
-                                .show(); 
-                        } else {
-                            push_log(format!("[INFO] Whitelisted device '{}' connected.", device));
-                        }
+            
+                for (id, name) in &current_devices {
+                    let whitelist = WHITELIST.read().unwrap();
+            
+                    if !whitelist.contains_key(id) && !known_devices.contains(id) {
+                        push_log(format!("[ALERT] Unknown device [{}] {} connected!", id, name));
+                        Notification::new()
+                            .summary("USB Device Alert")
+                            .body(&format!("Unknown device connected:\n[{}] {}", id, name))
+                            .icon("dialog-warning")
+                            .show()
+                            .ok();
                     }
                 }
-
-                // Try to find mount points under /media/debian
+            
+                // Обновляем known_devices
+                known_devices = current_devices.keys().cloned().collect();
+            
+                // Проверка на смонтированные пути
                 let user_mount_path = format!(
                     "/media/{}",
                     std::env::var("SUDO_USER")
@@ -307,25 +248,20 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                 );
                 if let Ok(entries) = folders(Path::new(&user_mount_path)) {
                     for path in entries {
-                        // Only hash files if not already scanned
                         if !scanned_paths.contains(&path) {
                             push_log(format!("[MOUNT DETECTED] {:?}", path));
-                            
                             start_hash_checker(&path);
-                            
                             scanned_paths.insert(path);
                         }
                     }
                 } else {
                     push_log(format!("[INFO] No devices in {} yet", user_mount_path));
                 }
-
-                known_devices = current_devices;
             }
+                     
         }
     }
 
-    // Restore terminal state
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
