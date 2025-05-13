@@ -3,6 +3,7 @@ use std::process::Command;
 use notify_rust::Notification;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
+use crate::push_log;
 
 /// Global static variable to track already notified devices within this session.
 /// Unsafe is required because mutable static variables can lead to data races.
@@ -39,7 +40,8 @@ pub fn create_whitelist_from_connected_devices() -> HashSet<String> {
                             .icon("dialog-information")
                             .show()
                         {
-                            eprintln!("Failed to show notification: {}", e);
+                            push_log(format!("Failed to show notification: {}", e));
+            
                         }
                         notified.insert(unique_id);
                     }

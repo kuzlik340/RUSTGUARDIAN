@@ -198,7 +198,6 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                         break;
                     }
                     if input.trim() == "lockdown" {
-                        logs.push(format!("Starting mew thread"));
                         start_find_device();
                     }
                     input.clear();

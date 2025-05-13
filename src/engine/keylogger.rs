@@ -7,12 +7,11 @@ use std::io::{Write};
 use chrono::Local;
 use crate::push_log;
 
-
 pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &str) -> std::io::Result<()> {
     /* Open device events with the path that will be sent from main thread */
     let msg = format!("All charactertsitics of device: {} {} {}", device_event_path, device_path, device_name);
     push_log(msg);
-   // println!("All charactertsitics of device: {} {} {}", device_event_path, device_path, device_name);
+    //println!("All charactertsitics of device: {} {} {}", device_event_path, device_path, device_name);
     let mut device = Device::open(device_event_path).expect("Failed to open device");
     let mut log_file = OpenOptions::new()
         .create(true)
@@ -24,7 +23,7 @@ pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &s
     let timestamp = now.format("%Y-%m-%d %H:%M:%S").to_string();
     write!(log_file, "[{}] Starting listening for events on the device with path: {}\n", timestamp, device_event_path)?;
     log_file.flush()?;
-    println!("[{}] Starting listening for keyboard activities", timestamp);
+    push_log(format!("[{}] Starting listening for keyboard activities", timestamp));
     let key_map = create_keymap();
     let mut backspace_found: bool = false;
     let mut timestamps: Vec<u128> = Vec::new();
@@ -58,9 +57,9 @@ pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &s
                         if too_small_diff > 5 {
                             let now = Local::now(); // Gets local time
                             let timestamp = now.format("%Y-%m-%d %H:%M:%S").to_string();
-                            println!("[{}] \x1b[31mWARNING\x1b[0m  RustGuardian registered BadUSB attack, the device will be unmounted", timestamp);
+                            push_log(format!("[{}] \x1b[31mWARNING\x1b[0m  RustGuardian registered BadUSB attack, the device will be unmounted", timestamp));
                             unmount_device(device_path)?;
-                            println!("[{}] Device was succesfully removed", timestamp);
+                            push_log(format!("[{}] Device was succesfully removed", timestamp));
                             break 'outer;
                         }
                         speed_test = false;
@@ -100,7 +99,7 @@ fn unmount_device(sysfs_device_path: &str) -> std::io::Result<()> {
 
     file.write_all(b"0")?;
 
-    println!("Power off for {} device (authorized=0)", sysfs_device_path);
+    push_log(format!("Power off for {} device (authorized=0)", sysfs_device_path));
     Ok(())
 }
 

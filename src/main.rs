@@ -12,6 +12,7 @@ lazy_static! {
 
 pub fn start_find_device() {
     let find_thread = thread::spawn(|| {
+        //println!("Starting thread");
         if let Err(e) = find_all_devices() {
             eprintln!("Find device error: {:?}", e);
         }
@@ -24,7 +25,10 @@ pub fn push_log(msg: String) {
 }
 
 pub fn get_logs() -> Vec<String> {
-    LOGS.lock().unwrap().clone()
+    let mut logs = LOGS.lock().unwrap();
+    let current_logs = logs.clone();  
+    logs.clear();                
+    current_logs                     
 }
 
 fn main() {
@@ -36,7 +40,7 @@ fn main() {
     });
 
     // А в основном потоке запускаем мониторинг
-    find_all_devices();
+    //find_all_devices();
 
     // Ждём завершения CLI, если find_all_devices когда-то завершится
     let _ = cli_thread.join();
