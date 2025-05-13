@@ -29,6 +29,9 @@ use tui::{
 use crate::get_logs;
 use crate::start_find_device;
 use crate::start_hash_checker;
+use chrono::Local;
+use crate::LOGS;
+
 //pub mod whitelist;
 //mod filehash;
 
@@ -50,6 +53,12 @@ fn folders(dir: &Path) -> Result<Vec<PathBuf>, io::Error> {
         .map(|r| r.unwrap().path())
         .filter(|r| r.is_dir())
         .collect())
+}
+
+pub fn push_log(msg: String) {
+    let mut logs = LOGS.lock().unwrap();
+    let timestamp = Local::now().format("[%H:%M:%S]").to_string();
+    logs.push(format!("{} {}", timestamp, msg));
 }
 
 pub fn run_cli() -> Result<(), Box<dyn Error>> {
@@ -96,7 +105,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
 
     for device in &known_devices {
         if !whitelist.contains(device) {
-            logs.push(format!("[ALERT] Unrecognized device on startup: '{}'", device));
+            push_log(format!("[ALERT] Unrecognized device on startup: '{}'", device));
             Notification::new()
                 .summary("USB Device Warning")
                 .body(&format!("Unrecognized device detected at startup:\n{}", device))
@@ -104,7 +113,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                 .show()
                 .unwrap();
         } else {
-            logs.push(format!("[INFO] Whitelisted device on startup: '{}'", device));
+            push_log(format!("[INFO] Whitelisted device on startup: '{}'", device));
         }
     }
 
@@ -193,7 +202,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                 KeyCode::Char(c) => input.push(c),
                 KeyCode::Backspace => { input.pop(); },
                 KeyCode::Enter => {
-                    logs.push(format!("> {}", input));
+                    push_log(format!("> {}", input));
                     scroll_offset = logs.len().saturating_sub(max_visible_lines);
                     if input.trim() == ":q" || input.trim() == "exit" {
                         break;
@@ -227,11 +236,11 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                 let current_devices = create_whitelist_from_connected_devices();
                 for device in &current_devices {
                     if !known_devices.contains(device) {
-                        logs.push(format!("[NEW DEVICE] {}", device));
+                        push_log(format!("[NEW DEVICE] {}", device));
                         pending_mounts.insert(device.clone());
 
                         if !whitelist.contains(device) {
-                            logs.push(format!("[ALERT] Unknown device '{}' connected!", device));
+                            push_log(format!("[ALERT] Unknown device '{}' connected!", device));
                             Notification::new()
                                 .summary("USB Device Alert")
                                 .body(&format!("Unknown device connected:\n{}", device))
@@ -239,7 +248,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                                 .show()
                                 .unwrap();
                         } else {
-                            logs.push(format!("[INFO] Whitelisted device '{}' connected.", device));
+                            push_log(format!("[INFO] Whitelisted device '{}' connected.", device));
                         }
                     }
                 }
@@ -250,7 +259,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                     for path in entries {
                         // Only hash files if not already scanned
                         if !scanned_paths.contains(&path) {
-                            logs.push(format!("[MOUNT DETECTED] {:?}", path));
+                            push_log(format!("[MOUNT DETECTED] {:?}", path));
                             
                             start_hash_checker(&path);
                             
@@ -258,7 +267,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                         }
                     }
                 } else {
-                    logs.push(format!("[INFO] No devices in {} yet", user_mount_path));
+                    push_log(format!("[INFO] No devices in {} yet", user_mount_path));
                 }
 
                 known_devices = current_devices;

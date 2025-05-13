@@ -10,6 +10,7 @@ use notify_rust::Notification;
 use crate::CLI::whitelist::create_whitelist_from_connected_devices;
 use crate::CLI::filehash::{hash_all_files_in_dir, load_hashes_from_file};
 use std::collections::HashSet;
+use chrono::Local;
 
 
 lazy_static! {
@@ -46,8 +47,10 @@ pub fn start_find_device() {
 
 pub fn push_log(msg: String) {
     let mut logs = LOGS.lock().unwrap();
-    logs.push(msg);
+    let timestamp = Local::now().format("[%H:%M:%S]").to_string();
+    logs.push(format!("{} {}", timestamp, msg));
 }
+
 
 pub fn get_logs() -> Vec<String> {
     let mut logs = LOGS.lock().unwrap();
@@ -64,7 +67,8 @@ fn main() {
     });
     {
         let mut hash_set = HASH_SET.lock().unwrap();
-        *hash_set = load_hashes_from_file("/home/timkuz/RUST_PROJECT/RUST_PROJECT/hashes.txt");
+        let mut user_mount_path = format!("/home/{}/RUST_PROJECT/RUST_PROJECT/hashes.txt", std::env::var("USER").unwrap_or_else(|_| "debian".into()));
+        *hash_set = load_hashes_from_file(&user_mount_path);
     }
 
     let whitelist = create_whitelist_from_connected_devices();
