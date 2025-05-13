@@ -5,6 +5,8 @@ use std::sync::{Arc, Mutex};
 use engine::find_device::find_all_devices;
 use CLI::cli::run_cli;
 use lazy_static::lazy_static;
+use notify_rust::Notification;
+use crate::CLI::whitelist::create_whitelist_from_connected_devices;
 
 lazy_static! {
     pub static ref LOGS: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
@@ -26,9 +28,9 @@ pub fn push_log(msg: String) {
 
 pub fn get_logs() -> Vec<String> {
     let mut logs = LOGS.lock().unwrap();
-    let current_logs = logs.clone();  
-    logs.clear();                
-    current_logs                     
+    let current_logs = logs.clone();
+    logs.clear();
+    current_logs
 }
 
 fn main() {
@@ -38,6 +40,9 @@ fn main() {
             eprintln!("CLI error: {:?}", e);
         }
     });
+
+    let whitelist = create_whitelist_from_connected_devices();
+
 
     // А в основном потоке запускаем мониторинг
     //find_all_devices();

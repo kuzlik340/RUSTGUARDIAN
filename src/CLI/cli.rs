@@ -8,6 +8,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use tui::widgets::Wrap;
 use std::{
     collections::HashSet,
     error::Error,
@@ -116,9 +117,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
 
     // Main loop
     loop {
-        let mut current_logs = get_logs();
-        current_logs.extend(logs.iter().cloned());
-        logs = current_logs;
+        logs.extend(get_logs());
         terminal.draw(|f| {
             // Layout
             let size = f.size();
@@ -158,7 +157,8 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                         Style::default().add_modifier(Modifier::BOLD)
                     } else {
                         Style::default()
-                    }));
+                    }))
+                    .wrap(Wrap { trim: true });;
 
             // Command panel
             let command_block = Paragraph::new(input.as_ref())
@@ -244,7 +244,8 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                 }
 
                 // Try to find mount points under /media/debian
-                if let Ok(entries) = folders(Path::new("/media/timkuz")) {
+                let user_mount_path = format!("/media/{}", std::env::var("USER").unwrap_or_else(|_| "debian".into()));
+                if let Ok(entries) = folders(Path::new(&user_mount_path)) {
                     for path in entries {
                         // Only hash files if not already scanned
                         if !scanned_paths.contains(&path) {
@@ -257,7 +258,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                         }
                     }
                 } else {
-                    logs.push("[INFO] No devices in /media/debian yet".to_string());
+                    logs.push(format!("[INFO] No devices in {} yet", user_mount_path));
                 }
 
                 known_devices = current_devices;
