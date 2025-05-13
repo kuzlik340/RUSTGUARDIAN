@@ -1,10 +1,12 @@
 use std::collections::HashSet;
 use std::process::Command;
 use notify_rust::Notification;
+use once_cell::sync::Lazy;
+use std::sync::Mutex;
 
 /// Global static variable to track already notified devices within this session.
 /// Unsafe is required because mutable static variables can lead to data races.
-static mut ALREADY_NOTIFIED: Option<HashSet<String>> = None;
+static ALREADY_NOTIFIED: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
 
 /// Creates a whitelist of currently connected USB devices using `lsusb`.
 /// For each new device detected (based on its unique ID), a desktop notification is shown.
@@ -29,19 +31,17 @@ pub fn create_whitelist_from_connected_devices() -> HashSet<String> {
                     whitelist.insert(device_name.clone());
 
                     // Show notification only if this device hasn't been notified yet
-                    unsafe {
-                        let notified = ALREADY_NOTIFIED.get_or_insert(HashSet::new());
-                        if !notified.contains(&unique_id) {
-                            if let Err(e) = Notification::new()
-                                .summary("Device Whitelisted")
-                                .body(&format!("Whitelisted device:\n{}", device_name))
-                                .icon("dialog-information")
-                                .show()
-                            {
-                                eprintln!("Failed to show notification: {}", e);
-                            }
-                            notified.insert(unique_id);
+                    let mut notified = ALREADY_NOTIFIED.lock().unwrap();
+                    if !notified.contains(&unique_id) {
+                        if let Err(e) = Notification::new()
+                            .summary("Device Whitelisted")
+                            .body(&format!("Whitelisted device:\n{}", device_name))
+                            .icon("dialog-information")
+                            .show()
+                        {
+                            eprintln!("Failed to show notification: {}", e);
                         }
+                        notified.insert(unique_id);
                     }
                 }
             }
@@ -51,7 +51,3 @@ pub fn create_whitelist_from_connected_devices() -> HashSet<String> {
     whitelist
 }
 
-/// Checks if a given device name is present in the whitelist.
-pub fn is_device_whitelisted(device_name: &str, whitelist: &HashSet<String>) -> bool {
-    whitelist.contains(device_name)
-}

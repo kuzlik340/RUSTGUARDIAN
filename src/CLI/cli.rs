@@ -1,4 +1,4 @@
-use super::whitelist::{create_whitelist_from_connected_devices, is_device_whitelisted};
+use super::whitelist::{create_whitelist_from_connected_devices};
 use super::filehash::hash_all_files_in_dir;
 use std::path::PathBuf;
 use std::fs;
@@ -12,7 +12,6 @@ use std::{
     collections::HashSet,
     error::Error,
     io,
-    process::Command,
     sync::mpsc,
     thread,
     time::{Duration, Instant},
@@ -73,11 +72,11 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                 .unwrap_or_else(|| Duration::from_secs(0));
             if event::poll(timeout).unwrap() {
                 if let CEvent::Key(key) = event::read().unwrap() {
-                    tx.send(Event::Input(key)).unwrap();
+                    let _ = tx.send(Event::Input(key));
                 }
             }
             if last_tick.elapsed() >= tick_rate {
-                tx.send(Event::Tick).unwrap();
+                let _ = tx.send(Event::Tick);
                 last_tick = Instant::now();
             }
         }
@@ -199,7 +198,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                         break;
                     }
                     if input.trim() == "lockdown" {
-                        logs.push(fomat!("Starting mew thread"));
+                        logs.push(format!("Starting mew thread"));
                         start_find_device();
                     }
                     input.clear();

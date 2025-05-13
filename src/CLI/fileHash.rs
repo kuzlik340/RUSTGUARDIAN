@@ -16,19 +16,15 @@ fn hash_file(path: &Path) -> Option<String> {
 /// computes SHA-256 hash for each file, and returns a vector of (file_path, hash) pairs.
 pub fn hash_all_files_in_dir(dir: &Path) -> Vec<(String, String)> {
     let mut hashes = Vec::new();
-    // Walk through directory recursively
+
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         if path.is_file() {
-            // Read and hash the file
-            if let Ok(data) = fs::read(path) {
-                let mut hasher = Sha256::new();
-                hasher.update(&data);
-                let result = hasher.finalize();
-                let hash_str = format!("{:x}", result);
-                hashes.push((path.display().to_string(), hash_str)); // Store file path and hash
+            if let Some(hash) = hash_file(path) {
+                hashes.push((path.display().to_string(), hash));
             }
         }
     }
+
     hashes
 }

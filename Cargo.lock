@@ -1069,6 +1069,7 @@ dependencies = [
  "libc",
  "notify",
  "notify-rust",
+ "once_cell",
  "sha2",
  "tui",
  "udev",
