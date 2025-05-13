@@ -10,6 +10,14 @@ lazy_static! {
     pub static ref LOGS: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
 }
 
+pub fn start_find_device() {
+    let find_thread = thread::spawn(|| {
+        if let Err(e) = find_all_devices() {
+            eprintln!("Find device error: {:?}", e);
+        }
+    });
+}
+
 pub fn push_log(msg: String) {
     let mut logs = LOGS.lock().unwrap();
     logs.push(msg);

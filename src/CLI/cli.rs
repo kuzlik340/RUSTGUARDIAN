@@ -26,7 +26,8 @@ use tui::{
     widgets::{Block, Borders, Paragraph},
     Terminal,
 };
-use main::get_logs;
+use crate::get_logs;
+use crate::start_find_device;
 //pub mod whitelist;
 //mod filehash;
 
@@ -196,6 +197,10 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                     scroll_offset = logs.len().saturating_sub(max_visible_lines);
                     if input.trim() == ":q" || input.trim() == "exit" {
                         break;
+                    }
+                    if input.trim() == "lockdown" {
+                        logs.push(fomat!("Starting mew thread"));
+                        start_find_device();
                     }
                     input.clear();
                 }
