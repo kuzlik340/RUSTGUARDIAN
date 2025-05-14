@@ -1,3 +1,4 @@
+
 use sysinfo::{System, SystemExt, ProcessExt};
 use std::collections::HashSet;
 use lazy_static::lazy_static;
@@ -58,7 +59,6 @@ pub fn scan_processes() -> Vec<ProcessScanResult> {
             reason,
         });
     }
-    drop(system);
     thread::sleep(Duration::from_millis(100));
 
     results

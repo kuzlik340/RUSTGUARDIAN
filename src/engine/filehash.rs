@@ -35,15 +35,15 @@ fn hash_file(path: &Path) -> Option<String> {
 /// computes SHA-256 hash for each file, and returns a vector of (file_path, hash) pairs.
 pub fn hash_all_files_in_dir(dir: &Path, hash_set: &HashSet<String>) -> Vec<(String, String)> {
     let mut hashes = Vec::new();
-
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         if path.is_file() {
             if let Some(hash) = hash_file(path) {
                 let hash_clone = hash.clone(); 
+                //push_log(format!("File with path {} has hash {} ", path.display(), hash));
                 hashes.push((path.display().to_string(), hash_clone));
                 if hash_set.contains(&hash) {
-                    push_log(format!("File with path: {} is malicious", path.display().to_string() ))
+                    push_log(format!("[ALERT] File with path: {} is malicious", path.display().to_string() ))
                 }
             }
         }

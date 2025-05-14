@@ -8,17 +8,23 @@ use chrono::Local;
 use std::sync::Arc;
 use crate::push_log;
 use std::sync::atomic::{AtomicBool, Ordering};
+use nix::poll::{poll, PollFd, PollFlags};
+use std::os::unix::io::AsRawFd;
+use std::os::fd::BorrowedFd;
+use notify_rust::Notification;
 
+/* This function logs all events on the input device */
 pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &str, running: Arc<AtomicBool>) -> std::io::Result<()> {
     /* Open device events with the path that will be sent from find_device thread */
     let mut device = Device::open(device_event_path).expect("Failed to open device");
+    let device_fd = device.as_raw_fd();
     let mut log_file = OpenOptions::new()
         .create(true)
         .write(true)
         .append(true)
         .mode(0o600)
         .open("logg.txt")?;
-    push_log("All events from keyboars will be saved into logg.txt".to_string());
+    push_log("[INFO] All events from input device will be saved into logg.txt".to_string());
     let now = Local::now(); // Gets local time
     let timestamp = now.format("%Y-%m-%d %H:%M:%S").to_string();
     write!(log_file, "[{}] Starting listening for events on the device with path: {}\n", timestamp, device_event_path)?;
@@ -27,58 +33,77 @@ pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &s
     let key_map = create_keymap();
     let mut backspace_found: bool = false;
     let mut timestamps: Vec<u128> = Vec::new();
-    'outer: while running.load(Ordering::Relaxed) {
-        for ev in device.fetch_events().expect("Failed to fetch events") {
-            if let InputEventKind::Key(key) = ev.kind() {
-                if ev.value() == 1 { //check time difference 
-                    let now = SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .expect("Time went backwards")
-                        .as_millis();
-                    /* Saving timestamp of click since we want to measure the difference in time between each clicks */
-                    timestamps.push(now);
-                    
-                    // Check the average speed of clicking for the first 7 clicks
-                    if timestamps.len() >= 7 {
-                        let mut time_diff_clicks: Vec<u128> = Vec::new();
-                        for i in 1..timestamps.len() {
-                            time_diff_clicks.push(timestamps[i] - timestamps[i - 1]);
-                        }
-                        let alltime: u128 = time_diff_clicks.iter().sum();
-                        let avg_speed_in_ms = alltime as f32 / time_diff_clicks.len() as f32;
-                        let mut too_small_diff = 0;
-                        for &diff in &time_diff_clicks {
-                            if (diff as f32 - avg_speed_in_ms).abs() < 150.0 {
-                                too_small_diff += 1;
+    let mut poll_fds = [PollFd::new(unsafe{BorrowedFd::borrow_raw(device_fd)}, PollFlags::POLLIN)];
+
+    while running.load(Ordering::Relaxed) {
+        match poll(&mut poll_fds, 100u16) {
+            Ok(0) => continue, 
+            Ok(_) => {
+                for ev in device.fetch_events().expect("Failed to fetch events") {
+                    if let InputEventKind::Key(key) = ev.kind() {
+                        if ev.value() == 1 { //check time difference 
+                            let now = SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .expect("Time went backwards")
+                                .as_millis();
+                            /* Saving timestamp of click since we want to measure the difference in time between each clicks */
+                            timestamps.push(now);
+                            
+                            // Check the average speed of clicking for the first 7 clicks
+                            if timestamps.len() >= 7 {
+                                let mut time_diff_clicks: Vec<u128> = Vec::new();
+                                for i in 1..timestamps.len() {
+                                    time_diff_clicks.push(timestamps[i] - timestamps[i - 1]);
+                                }
+                                let alltime: u128 = time_diff_clicks.iter().sum();
+                                let avg_speed_in_ms = alltime as f32 / time_diff_clicks.len() as f32;
+                                let mut too_small_diff = 0;
+                                for &diff in &time_diff_clicks {
+                                    if (diff as f32 - avg_speed_in_ms).abs() < 40.0 {
+                                        too_small_diff += 1;
+                                    }
+                                }
+                                if too_small_diff > 5 {
+                                    push_log(format!("[WARNING] RustGuardian registered BadUSB attack, the device will be unmounted"));
+                                    unmount_device(device_path)?;
+                                    // Send notification
+                                    Notification::new()
+                                        .summary("USB Device Alert")
+                                        .body(&format!("Registered BadUSB attack, the device {} will be disconnected \n", device_name))
+                                        .icon("dialog-warning")
+                                        .show()
+                                        .ok(); 
+                                    push_log(format!("[ACTION] Device was succesfully removed"));
+                                }
+                                else{
+                                    push_log("[RESULT] The device was scanned, not a BAD USB".to_string());
+                                }
+                                return Ok(());
                             }
-                        }
-                        if too_small_diff > 5 {
-                            push_log(format!("WARNING RustGuardian registered BadUSB attack, the device will be unmounted"));
-                            unmount_device(device_path)?;
-                            push_log(format!("Device was succesfully removed"));
-                        }
-                        else{
-                            push_log("The device was scanned, not a BAD USB".to_string());
-                        }
-                        break 'outer;
-                    }
-                    if key != Key::KEY_BACKSPACE {
-                        backspace_found = false;
-                        if let Some(character) = key_map.get(&key) {
-                            log_file.write_all(character.as_bytes())?;
-                            log_file.flush()?;
-                        }
-                    } else {
-                        if backspace_found {
-                            continue;
-                        }
-                        else{
-                            log_file.write_all(b"\n")?;
-                            log_file.flush()?;
-                            backspace_found = true;
+                            // If input device uses backspace we will go to a newline in logg.txt
+                            if key != Key::KEY_BACKSPACE {
+                                backspace_found = false;
+                                if let Some(character) = key_map.get(&key) {
+                                    log_file.write_all(character.as_bytes())?;
+                                    log_file.flush()?;
+                                }
+                            } else {
+                                if backspace_found {
+                                    continue;
+                                }
+                                else{
+                                    log_file.write_all(b"\n")?;
+                                    log_file.flush()?;
+                                    backspace_found = true;
+                                }
+                            }
                         }
                     }
                 }
+            }
+            Err(e) => {
+                push_log(format!("poll failed: {}", e));
+                break;
             }
         }
     }
@@ -98,7 +123,7 @@ fn unmount_device(sysfs_device_path: &str) -> std::io::Result<()> {
 
     file.write_all(b"0")?;
 
-    push_log(format!("Power off for {} device (authorized=0)", sysfs_device_path));
+    push_log(format!("[ACTION] Power off for {} device (authorized=0)", sysfs_device_path));
     Ok(())
 }
 
