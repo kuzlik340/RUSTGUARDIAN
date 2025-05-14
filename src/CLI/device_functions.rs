@@ -22,13 +22,20 @@ impl DeviceList {
 
     // Logs all non-empty device entries to the log system
     pub fn log_devices(&self) {
-        push_log("[DEVICE LIST] ---------------------".to_string());
+        push_log("[REVIEW DEVICE LIST] ---------------------".to_string());
+        let mut any_found = false;
         for (i, entry) in self.devices.iter().enumerate() {
             if let Some(device) = entry {
                 push_log(format!("{}: [{}] {}", i, device.id, device.name));
+                any_found = true;
             }
         }
+
+        if !any_found {
+            push_log("[REVIEW DEVICE LIST] is empty".to_string());
+        }
     }
+
 
     // Adds a new device to the first available empty slot
     // Rejects duplicates based on device ID

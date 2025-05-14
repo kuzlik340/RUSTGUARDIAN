@@ -25,17 +25,19 @@ use std::{
 use tui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
-    style::{Modifier, Style},
+    style::{Modifier, Style, Color},
     text::{Span, Spans},
     widgets::{Block, Borders, Paragraph},
     Terminal,
 };
+
 use crate::get_logs;
 use crate::DeviceMonitor;
 use crate::start_hash_checker;
 use crate::push_log;
 use crate::WHITELIST;
 use crate::WHITELIST_READY;
+
 
 // Enum to differentiate between keyboard input and timed tick events
 enum Event<I> {
@@ -170,35 +172,48 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
 
             // Render logs, command input, and whitelist
             let log_block = Paragraph::new(visible_logs)
-                .block(Block::default()
-                    .title("Device logs")
-                    .borders(Borders::ALL)
-                    .style(if matches!(focus, Focus::Logs) {
-                        Style::default().add_modifier(Modifier::BOLD)
-                    } else {
-                        Style::default()
-                    }))
+                .block(
+                    Block::default()
+                        .title("Device logs")
+                        .borders(Borders::ALL)
+                        .style(
+                            if matches!(focus, Focus::Logs) {
+                                Style::default().fg(Color::White)
+                            } else {
+                                Style::default().fg(Color::DarkGray)
+                            }
+                        )
+                )
                 .wrap(Wrap { trim: true });
 
             let command_block = Paragraph::new(input.as_ref())
-                .block(Block::default()
-                    .title("Commands")
-                    .borders(Borders::ALL)
-                    .style(if matches!(focus, Focus::Logs) {
-                        Style::default().add_modifier(Modifier::BOLD)
-                    } else {
-                        Style::default()
-                    }));
+                .block(
+                    Block::default()
+                        .title("Commands")
+                        .borders(Borders::ALL)
+                        .style(
+                            if matches!(focus, Focus::Logs) {
+                                Style::default().fg(Color::White)
+                            } else {
+                                Style::default().fg(Color::DarkGray)
+                            }
+                        )
+                );
 
             let device_block = Paragraph::new(visible_devices)
-                .block(Block::default()
-                    .title("Safe devices (Whitelist)")
-                    .borders(Borders::ALL)
-                    .style(if matches!(focus, Focus::Whitelist) {
-                        Style::default().add_modifier(Modifier::BOLD)
-                    } else {
-                        Style::default()
-                    }));
+                .block(
+                    Block::default()
+                        .title("Safe devices (Whitelist)")
+                        .borders(Borders::ALL)
+                        .style(
+                            if matches!(focus, Focus::Whitelist) {
+                                Style::default().fg(Color::White)
+                            } else {
+                                Style::default().fg(Color::DarkGray)
+                            }
+                        )
+                );
+
 
             f.render_widget(log_block, vertical_chunks[0]);
             f.render_widget(command_block, vertical_chunks[1]);
@@ -355,6 +370,25 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                         }
                     }
                 }
+
+                // Remove disconnected devices from device_list
+                let current_ids: HashSet<_> = current_devices.keys().cloned().collect();
+                let removed_ids: Vec<String> = known_devices
+                    .difference(&current_ids)
+                    .cloned()
+                    .collect();
+
+                for id in removed_ids {
+                    // Try to find and remove device from device_list
+                    if let Some(index) = (0..100).find(|&i| device_list.get(i).map(|d| &d.id) == Some(&id)) {
+                        if let Err(e) = device_list.remove_device(index) {
+                            push_log(format!("> Failed to remove disconnected device [{}]: {}", id, e));
+                        } else {
+                            push_log(format!("> Device [{}] disconnected and removed from review device list", id));
+                        }
+                    }
+                }
+
 
                 // Update seen device list
                 known_devices = current_devices.keys().cloned().collect();
