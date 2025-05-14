@@ -58,12 +58,12 @@ pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &s
                         if too_small_diff > 5 {
                             let now = Local::now(); // Gets local time
                             let timestamp = now.format("%Y-%m-%d %H:%M:%S").to_string();
-                            push_log(format!("[{}] \x1b[31mWARNING\x1b[0m  RustGuardian registered BadUSB attack, the device will be unmounted", timestamp));
+                            push_log(format!("[{}] WARNING RustGuardian registered BadUSB attack, the device will be unmounted", timestamp));
                             unmount_device(device_path)?;
                             push_log(format!("[{}] Device was succesfully removed", timestamp));
-                            break 'outer;
                         }
                         speed_test = false;
+                        break 'outer;
                     }
                     if key != Key::KEY_BACKSPACE {
                         backspace_found = false;

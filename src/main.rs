@@ -102,6 +102,12 @@ fn main() {
     let user_mount_path = format!("{}/hashes.txt", env!("CARGO_MANIFEST_DIR"));
     {
         let mut hash_set = HASH_SET.lock().unwrap();
+        let mut user_mount_path = format!(
+            "/home/{}/RUST_PROJECT/RUST_PROJECT/hashes.txt",
+            std::env::var("SUDO_USER")
+                .or_else(|_| std::env::var("USER"))  // Fallback to USER if SUDO_USER not set
+                .unwrap_or_else(|_| "debian".into()) // Final fallback
+        );
         *hash_set = load_hashes_from_file(&user_mount_path);
     }
 

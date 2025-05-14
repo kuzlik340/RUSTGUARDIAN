@@ -53,6 +53,9 @@ pub fn folders(dir: &Path) -> Result<Vec<PathBuf>, io::Error> {
 }
 
 pub fn run_cli() -> Result<(), Box<dyn Error>> {
+    if(std::env::var("USER").unwrap_or_default() != "root"){
+        push_log("The lockdown mode is disabled, since youn are not root".to_string());
+    }
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
@@ -197,6 +200,38 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                     if input.trim() == ":q" || input.trim() == "exit" {
                         break;
                     }
+                    else if input.trim() == "enable LockDown" {
+                        if(std::env::var("USER").unwrap_or_default() != "root"){
+                            push_log("[SECURITY] You are not root".to_string());
+                        }
+                        else{
+                            push_log("[SECURITY] LockDown mode enabled".to_string());
+                            device_monitor.start();
+                        }
+                        //enable_lockdown();
+                        
+                    }
+                    else if input.trim() == "enable SafeConnection" {
+                        //start_find_device();
+                    }
+                    else if input.trim() == "disable LockDown" {
+                        //disable_lockdown();
+                        device_monitor.stop();
+                        push_log("[SECURITY] LockDown mode disabled".to_string());
+                    }
+                    else if input.trim() == "disable SafeConnection" {
+
+                    }
+                    else if input.trim() == "add device" {
+
+                    }
+                    else if input.trim() == "del device" {
+
+                    }
+                    else if input.trim() == "list device" {
+
+                    }
+
                     input.clear();
                 }
                 KeyCode::Up => match focus {
