@@ -11,8 +11,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &str, running: Arc<AtomicBool>) -> std::io::Result<()> {
     /* Open device events with the path that will be sent from find_device thread */
-    let msg = format!("All charactertsitics of device: {} {} {}", device_event_path, device_path, device_name);
-    push_log(msg);
     let mut device = Device::open(device_event_path).expect("Failed to open device");
     let mut log_file = OpenOptions::new()
         .create(true)
@@ -38,9 +36,8 @@ pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &s
                         .expect("Time went backwards")
                         .as_millis();
                     /* Saving timestamp of click since we want to measure the difference in time between each clicks */
-                    if speed_test {
-                        timestamps.push(now);
-                    }
+                    timestamps.push(now);
+                    
                     // Check the average speed of clicking for the first 7 clicks
                     if timestamps.len() >= 7 {
                         let mut time_diff_clicks: Vec<u128> = Vec::new();
@@ -59,6 +56,9 @@ pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &s
                             push_log(format!("WARNING RustGuardian registered BadUSB attack, the device will be unmounted"));
                             unmount_device(device_path)?;
                             push_log(format!("Device was succesfully removed"));
+                        }
+                        else{
+                            push_log("The device was scanned, not a BAD USB".to_string());
                         }
                         break 'outer;
                     }
@@ -82,7 +82,6 @@ pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &s
             }
         }
     }
-    push_log("The device was scanned, not a BAD USB".to_string());
     Ok(())
 }
 

@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::process::Command;
 use lazy_static::lazy_static;
 use crate::RwLock;
@@ -9,9 +8,6 @@ use std::collections::HashMap;
 lazy_static! {
     pub static ref WHITELIST: RwLock<HashMap<String, String>> = RwLock::new(HashMap::new());
 }
-
-
-
 
 /// Scans currently connected USB devices using `lsusb`,
 /// extracts their ID (e.g. 046d:c534), shows notification if not yet shown,

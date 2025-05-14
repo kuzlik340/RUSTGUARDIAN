@@ -1,5 +1,5 @@
 mod engine;
-mod CLI;
+mod cli;
 
 use std::{path::Path};
 use std::fs::{File};
@@ -14,14 +14,17 @@ use std::thread::JoinHandle;
 use std::collections::HashMap;
 use lazy_static::lazy_static;
 use chrono::Local;
-
+use std::io::{Cursor, Read};
+use zip::read::ZipArchive;
 
 use engine::find_device::find_all_devices;
 use engine::process_checker::scan_processes;
-use CLI::cli::run_cli;
-use crate::CLI::whitelist::create_whitelist_from_connected_devices;
-use crate::CLI::filehash::{hash_all_files_in_dir, load_hashes_from_file};
+use cli::cli::run_cli;
+use crate::cli::whitelist::create_whitelist_from_connected_devices;
+use crate::cli::filehash::{hash_all_files_in_dir, load_hashes_from_file};
 use crate::engine::process_checker::ProcessScanResult;
+use reqwest::blocking::get;
+
 
 // Global log store
 lazy_static! {
@@ -44,17 +47,27 @@ pub struct DeviceMonitor {
 /// Downloads SHA256 hashes from Abuse.ch and writes to a local file.
 pub fn download_and_save_hashes(path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let url = "https://bazaar.abuse.ch/export/txt/sha256/full/";
-    let response = reqwest::blocking::get(url)?.text()?;
+    let response = get(url)?.bytes()?;
 
-    let file = File::create(path)?;
+    let cursor = Cursor::new(response);
+    let mut archive = ZipArchive::new(cursor)?;
+
+    let mut file = File::create(path)?;
     let mut writer = BufWriter::new(file);
 
-    for line in response.lines() {
-        let line = line.trim();
-        if line.starts_with('#') || line.is_empty() {
-            continue;
+    if archive.len() > 0 {
+        let mut zipped_file = archive.by_index(0)?;
+        let mut buffer = String::new();
+        zipped_file.read_to_string(&mut buffer)?;
+
+        for line in buffer.lines() {
+            let line = line.trim();
+            if !line.starts_with('#') && !line.is_empty() {
+                writeln!(writer, "{}", line)?;
+            }
         }
-        writeln!(writer, "{}", line)?;
+    } else {
+        return Err("ZIP archive is empty".into());
     }
 
     Ok(())
@@ -138,13 +151,19 @@ impl DeviceMonitor {
 // Basically this starts a thread that will hash all files in the directory on the flash drive
 // So our program could then compare hashes to the hashes of viruses
 pub fn start_hash_checker(dir: &Path) {
+    let hash_set = HASH_SET.lock().unwrap();
+    let hash_set_ref: &HashSet<String> = &hash_set;
+    if hash_set_ref.is_empty() {
+        push_log("There is no file to compare hashes, 
+        please ensure that you have them or enable internet connection on the device so program could download them".to_string());
+    }
     let path = dir.to_path_buf();
     let hash_thread = thread::spawn(move || {
         let hash_set = HASH_SET.lock().unwrap();
         let hash_set_ref: &HashSet<String> = &hash_set;
         let _ = hash_all_files_in_dir(&path, hash_set_ref);
+        push_log(format!("Finished checking {}", path.display()));
     });
-    // hash_thread.join().unwrap();
 }
 
 // Push a new log entry with a timestamp for the TUI CLI interface
@@ -169,22 +188,37 @@ fn main() {
             eprintln!("CLI error: {:?}", e);
         }
     });
+    push_log("Preparing the RustGuard for work, please wait".to_string());
 
     // Load file hashes from project root. This operation takes about 8 seconds
-    let user_mount_path = format!("{}/hashes.txt", env!("CARGO_MANIFEST_DIR"));
-    
-    match download_and_save_hashes(&user_mount_path) {
-        Ok(_) => push_log("[INFO] Successfully downloaded and saved hashes from Abuse.ch".to_string()),
-        Err(e) => push_log(format!("[ERROR] Failed to download hashes: {}", e)),
-    }
-    
-    {
-        let mut hash_set = HASH_SET.lock().unwrap();
-        *hash_set = load_hashes_from_file(&user_mount_path);
-        push_log(format!("[INFO] Loaded {} hashes into memory", hash_set.len()));
-        hash_set.insert("f24ce28974944743b1bb81a7c3aecdbcc0af63454ee5df8e5fec741634c440a6".to_string());
-    }
+    let device_hashes_path = format!("{}/hashes.txt", env!("CARGO_MANIFEST_DIR"));
+    let mut hashes_exists = false;
 
+    if Path::new(&device_hashes_path).exists() {
+        push_log("[INFO] Hashes.txt was found on device".to_string());
+        hashes_exists = true;
+    } else {
+        match download_and_save_hashes(&device_hashes_path) {
+            Ok(_) => {
+                push_log("[INFO] Hashes are downloaded from abuse.ch".to_string());
+                hashes_exists = true;
+            }
+            Err(e) => push_log(format!("[ERROR] Error when trying to load hashes: {}", e)),
+        }
+    }
+    if hashes_exists {
+        push_log("Extracting hashes, please wait".to_string());
+        {
+            let mut hash_set = HASH_SET.lock().unwrap();
+            *hash_set = load_hashes_from_file(&device_hashes_path);
+            push_log(format!("[INFO] Loaded {} hashes into memory", hash_set.len()));
+            hash_set.insert("f24ce28974944743b1bb81a7c3aecdbcc0af63454ee5df8e5fec741634c440a6".to_string());
+        }
+    }
+    else{
+        push_log("Hashes could not be extracted. The SafeConnection mode is disabled".to_string());
+    }
+    push_log("Initializing whitelist, please wait".to_string());
     // Initialize whitelist once
     {
         let whitelist_set: HashMap<String, String> = create_whitelist_from_connected_devices();
@@ -192,7 +226,7 @@ fn main() {
         *whitelist = whitelist_set;
         WHITELIST_READY.store(true, Ordering::SeqCst);
     }
-
+    push_log("The RustGuard is prepared to guard your connections!".to_string());
     // Wait for CLI thread to finish
     let _ = cli_thread.join();
 }

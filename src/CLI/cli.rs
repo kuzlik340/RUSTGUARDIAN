@@ -1,6 +1,5 @@
 // Imports necessary modules and functions
 use super::whitelist::create_whitelist_from_connected_devices;
-use super::filehash::{hash_all_files_in_dir, load_hashes_from_file};
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::fs;
@@ -29,7 +28,7 @@ use tui::{
     widgets::{Block, Borders, Paragraph},
     Terminal,
 };
-
+use std::collections::VecDeque;
 use crate::get_logs;
 use crate::DeviceMonitor;
 use crate::start_hash_checker;
@@ -59,6 +58,41 @@ pub fn folders(dir: &Path) -> Result<Vec<PathBuf>, io::Error> {
         .collect())
 }
 
+pub fn all_folders_recursive(root: &Path) -> Result<Vec<PathBuf>, io::Error> {
+    let mut result = vec![];
+    let mut queue = VecDeque::new();
+
+    if root.is_dir() {
+        queue.push_back(root.to_path_buf());
+    }
+
+    while let Some(current_dir) = queue.pop_front() {
+        for entry in fs::read_dir(&current_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                result.push(path.clone());
+                queue.push_back(path);
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+
+fn is_usb_flash(device_id: &str) -> bool {
+    let sysfs_path = format!("/sys/bus/usb/devices/{}/bDeviceClass", 
+                            device_id.replace(':', "."));
+    
+    // Читаем класс устройства (0x08 - Mass Storage)
+    std::fs::read_to_string(sysfs_path)
+        .ok()
+        .and_then(|s| u8::from_str_radix(s.trim(), 16).ok())
+        .map(|class| class == 0x08)
+        .unwrap_or(false)
+}
+
 // Entry point for the CLI interface
 pub fn run_cli() -> Result<(), Box<dyn Error>> {
     if std::env::var("USER").unwrap_or_default() != "root" {
@@ -70,12 +104,10 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // Sets for detected devices and scanned mount paths
-    let mut scanned_paths: HashSet<PathBuf> = HashSet::new();
-
     // DeviceList to hold detected but not whitelisted USB devices
     let mut device_list = DeviceList::new(100);
-    let mut SafeConnection = false;
+    let mut safe_connection = false;
+    let mut lockdown = false;
     // Channel for communicating between UI input and tick thread
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
@@ -114,6 +146,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                 .icon("dialog-warning")
                 .show()
                 .ok();
+
         } else {
             push_log(format!("[INFO] Whitelisted device on startup: '{}'", device));
         }
@@ -229,7 +262,12 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                 
                     // Command parsing
                     match input.trim() {
-                        ":q" | "exit" => break, // Exit CLI
+                        ":q" | "exit" => {
+                            if lockdown{
+                                device_monitor.stop();
+                            }
+                            break;
+                        }
 
                         "dlist" => {
                             device_list.log_devices(); // List all tracked untrusted devices
@@ -270,25 +308,36 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                             if std::env::var("USER").unwrap_or_default() != "root" {
                                 push_log("[SECURITY] You are not root".to_string());
                             }
-                            else{
+                            else if !lockdown {
+                                lockdown = true;
                                 push_log("[SECURITY] LockDown mode enabled".to_string());
                                 device_monitor.start();
                             }
-                            //enable_lockdown();
+                            else{
+                                push_log("[SECURITY] LockDown mode was already enabled".to_string());
+                            }
                         }
                         
                         "enable SafeConnection" => {
-                            SafeConnection = true;
+                            push_log("[SECURITY] SafeConnection mode enabled".to_string());
+                            safe_connection = true;
                         }
 
                         "disable LockDown" => {
-                            //disable_lockdown();
-                            device_monitor.stop();
-                            push_log("[SECURITY] LockDown mode disabled".to_string());
+                            if lockdown {
+                                lockdown = false;
+                                device_monitor.stop();
+                                push_log("[SECURITY] LockDown mode disabled".to_string());
+                            }
+                            else{
+                                push_log("[SECURITY] LockDown was not enabled".to_string());
+                            }
+                             
                         }
 
                         "disable SafeConnection" => {
-                            SafeConnection = false;
+                            push_log("[SECURITY] SafeConnection mode disabled".to_string());
+                            safe_connection = false;
                         }
 
                         _ => {
@@ -331,16 +380,49 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
 
                 for (id, name) in &current_devices {
                     let whitelist = WHITELIST.read().unwrap();
-
+                    let id_clone = id.clone();
+                    let name_clone = name.clone();
                     // If device is unknown, warn and add to tracked list
                     if !whitelist.contains_key(id) && !known_devices.contains(id) {
-                        push_log(format!("[ALERT] Unknown device [{}] {} connected!", id, name));
+                        push_log(format!("[ALERT] Unknown device [{}] {} connected!", id_clone, name_clone));
+                        let is_flash = is_usb_flash(&id_clone);
+                        push_log(format!("IS flash = {}", is_flash));
                         Notification::new()
                             .summary("USB Device Alert")
-                            .body(&format!("Unknown device connected:\n[{}] {}", id, name))
+                            .body(&format!("Unknown device connected:\n[{}] {}", id_clone, name_clone))
                             .icon("dialog-warning")
                             .show()
-                            .ok();
+                            .ok(); 
+                        known_devices = current_devices.keys().cloned().collect();
+
+                        if safe_connection {
+                            thread::spawn(move || {
+                                let user_mount_path = format!(
+                                            "/media/{}",
+                                            std::env::var("SUDO_USER")
+                                                .or_else(|_| std::env::var("USER"))
+                                                .unwrap_or_else(|_| "debian".to_string())
+                                );
+
+                                push_log(format!("[USB MOUNT DETECTED] {:?}", user_mount_path));
+                                // Check for mounted paths in /media
+                                let mut scanned_paths: HashSet<PathBuf> = HashSet::new();
+                                thread::sleep(Duration::from_secs(2));
+                                if let Ok(entries) =  folders(Path::new(&user_mount_path)) {
+                                    if entries.is_empty() {
+                                        push_log(format!("[INFO] Directory {} is empty", user_mount_path));
+                                    }
+                                    for path in entries {
+                                        if !scanned_paths.contains(&path) {
+                                            start_hash_checker(&path);
+                                            scanned_paths.insert(path);
+                                        }
+                                    }
+                                } else {
+                                    push_log(format!("[INFO] No devices in {} yet", user_mount_path));
+                                }
+                            });
+                        }
 
                         let entry = DeviceEntry {
                             id: id.clone(),
@@ -377,28 +459,8 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
 
 
                 // Update seen device list
-                known_devices = current_devices.keys().cloned().collect();
-
-                if SafeConnection {
-                    // Check for mounted paths in /media
-                    let user_mount_path = format!(
-                        "/media/{}",
-                        std::env::var("SUDO_USER")
-                            .or_else(|_| std::env::var("USER"))
-                            .unwrap_or_else(|_| "debian".to_string())
-                    );
-                    if let Ok(entries) = folders(Path::new(&user_mount_path)) {
-                        for path in entries {
-                            if !scanned_paths.contains(&path) {
-                                push_log(format!("[MOUNT DETECTED] {:?}", path));
-                                start_hash_checker(&path);
-                                scanned_paths.insert(path);
-                            }
-                        }
-                    } else {
-                        push_log(format!("[INFO] No devices in {} yet", user_mount_path));
-                    }
-                }     
+            
+        
             }
         }
     }

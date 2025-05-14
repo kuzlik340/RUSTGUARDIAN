@@ -45,9 +45,6 @@ pub fn hash_all_files_in_dir(dir: &Path, hash_set: &HashSet<String>) -> Vec<(Str
                 if hash_set.contains(&hash) {
                     push_log(format!("File with path: {} is malicious", path.display().to_string() ))
                 }
-                else{
-                    //push_log(format!("File with path: {} is good", path.display().to_string() ))
-                }
             }
         }
     }

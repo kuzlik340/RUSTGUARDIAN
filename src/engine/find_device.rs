@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
  * This is used in the LockDown mode so we could then intercept what the keyboard is writing into system */
 pub fn find_all_devices(running: Arc<AtomicBool>) -> std::io::Result<()> {
     let monitor = MonitorBuilder::new()?.listen()?; // Create a monitor for monitoring events on all input devices
-    push_log(format!("Starting RustGuardian for input devices, waiting for new devices..."));
+    push_log(format!("Starting scanning for input devices, waiting for new devices..."));
     // Variables for controling the child threads
     let keyloggers_running = Arc::new(AtomicBool::new(true));
     let mut keylogger_threads = Vec::new();
@@ -26,7 +26,6 @@ pub fn find_all_devices(running: Arc<AtomicBool>) -> std::io::Result<()> {
                         // Retrieving the device characteristics
                         if let Some(name) = device.property_value("NAME") {
                             name_str = name.to_string_lossy().into_owned();
-                            push_log(format!("Device name: {}", name_str));
                         }
                         let mut dev_identificator: String = String::from("NULL");
                         match device.parent_with_subsystem("usb") {
@@ -47,9 +46,6 @@ pub fn find_all_devices(running: Arc<AtomicBool>) -> std::io::Result<()> {
 
                         if let Some(devnode) = device.devnode() {
                             // Creating a datapath that will contain events for the new keyboard
-                            if devnode.to_str().map(|s| s.contains("/dev/input")).unwrap_or(false) {
-                                push_log(format!("Main keyboard device event: {}", devnode.display()));
-                            }
                             let devnode_str = devnode.to_str().unwrap().to_string();
                             
                             let keyloggers_running_clone = keyloggers_running.clone();
