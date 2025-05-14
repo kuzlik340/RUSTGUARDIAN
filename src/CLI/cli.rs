@@ -77,7 +77,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
 
     // DeviceList to hold detected but not whitelisted USB devices
     let mut device_list = DeviceList::new(100);
-
+    let mut SafeConnection = false;
     // Channel for communicating between UI input and tick thread
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
@@ -280,7 +280,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                         }
                         
                         "enable SafeConnection" => {
-                            //start_find_device();
+                            SafeConnection = true;
                         }
 
                         "disable LockDown" => {
@@ -290,19 +290,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                         }
 
                         "disable SafeConnection" => {
-
-                        }
-
-                        "add device" => {
-
-                        }
-
-                        "del device" => {
-
-                        }
-
-                        "list device" => {
-
+                            SafeConnection = false;
                         }
 
                         _ => {
@@ -393,24 +381,26 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                 // Update seen device list
                 known_devices = current_devices.keys().cloned().collect();
 
-                // Check for mounted paths in /media
-                let user_mount_path = format!(
-                    "/media/{}",
-                    std::env::var("SUDO_USER")
-                        .or_else(|_| std::env::var("USER"))
-                        .unwrap_or_else(|_| "debian".to_string())
-                );
-                if let Ok(entries) = folders(Path::new(&user_mount_path)) {
-                    for path in entries {
-                        if !scanned_paths.contains(&path) {
-                            push_log(format!("[MOUNT DETECTED] {:?}", path));
-                            start_hash_checker(&path);
-                            scanned_paths.insert(path);
+                if(SafeConnection){
+                    // Check for mounted paths in /media
+                    let user_mount_path = format!(
+                        "/media/{}",
+                        std::env::var("SUDO_USER")
+                            .or_else(|_| std::env::var("USER"))
+                            .unwrap_or_else(|_| "debian".to_string())
+                    );
+                    if let Ok(entries) = folders(Path::new(&user_mount_path)) {
+                        for path in entries {
+                            if !scanned_paths.contains(&path) {
+                                push_log(format!("[MOUNT DETECTED] {:?}", path));
+                                start_hash_checker(&path);
+                                scanned_paths.insert(path);
+                            }
                         }
+                    } else {
+                        push_log(format!("[INFO] No devices in {} yet", user_mount_path));
                     }
-                } else {
-                    push_log(format!("[INFO] No devices in {} yet", user_mount_path));
-                }
+                }     
             }
         }
     }

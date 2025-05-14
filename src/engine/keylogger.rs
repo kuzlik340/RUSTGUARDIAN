@@ -10,10 +10,9 @@ use crate::push_log;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &str, running: Arc<AtomicBool>) -> std::io::Result<()> {
-    /* Open device events with the path that will be sent from main thread */
+    /* Open device events with the path that will be sent from find_device thread */
     let msg = format!("All charactertsitics of device: {} {} {}", device_event_path, device_path, device_name);
     push_log(msg);
-    //println!("All charactertsitics of device: {} {} {}", device_event_path, device_path, device_name);
     let mut device = Device::open(device_event_path).expect("Failed to open device");
     let mut log_file = OpenOptions::new()
         .create(true)
@@ -21,11 +20,12 @@ pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &s
         .append(true)
         .mode(0o600)
         .open("logg.txt")?;
+    push_log("All events from keyboars will be saved into logg.txt".to_string());
     let now = Local::now(); // Gets local time
     let timestamp = now.format("%Y-%m-%d %H:%M:%S").to_string();
     write!(log_file, "[{}] Starting listening for events on the device with path: {}\n", timestamp, device_event_path)?;
     log_file.flush()?;
-    push_log(format!("[{}] Starting listening for keyboard activities", timestamp));
+    push_log(format!("Starting listening for keyboard activities"));
     let key_map = create_keymap();
     let mut backspace_found: bool = false;
     let mut timestamps: Vec<u128> = Vec::new();
@@ -33,7 +33,7 @@ pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &s
     'outer: while running.load(Ordering::Relaxed) {
         for ev in device.fetch_events().expect("Failed to fetch events") {
             if let InputEventKind::Key(key) = ev.kind() {
-                if ev.value() == 1 { //check разница между всеми нажатиями
+                if ev.value() == 1 { //check time difference 
                     let now = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .expect("Time went backwards")
@@ -42,6 +42,7 @@ pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &s
                     if speed_test {
                         timestamps.push(now);
                     }
+                    // Check the average speed of clicking for the first 7 clicks
                     if timestamps.len() >= 7 {
                         let mut time_diff_clicks: Vec<u128> = Vec::new();
                         for i in 1..timestamps.len() {
@@ -58,9 +59,9 @@ pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &s
                         if too_small_diff > 5 {
                             let now = Local::now(); // Gets local time
                             let timestamp = now.format("%Y-%m-%d %H:%M:%S").to_string();
-                            push_log(format!("[{}] WARNING RustGuardian registered BadUSB attack, the device will be unmounted", timestamp));
+                            push_log(format!("WARNING RustGuardian registered BadUSB attack, the device will be unmounted"));
                             unmount_device(device_path)?;
-                            push_log(format!("[{}] Device was succesfully removed", timestamp));
+                            push_log(format!("Device was succesfully removed"));
                         }
                         speed_test = false;
                         break 'outer;
@@ -85,15 +86,17 @@ pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &s
             }
         }
     }
+    push_log("The device was scanned, not a BAD USB".to_string());
     Ok(())
 }
 
 
 fn unmount_device(sysfs_device_path: &str) -> std::io::Result<()> {
-    // Путь к файлу /sys/bus/usb/devices/2-1/authorized
+    // Datapath example: /sys/bus/usb/devices/2-1/authorized. 
+    // When changing option in authorised the device could not then communicate with OS
     let authorized_file = format!("/sys/bus/usb/devices/{}/authorized", sysfs_device_path);
 
-    // Записываем "0", чтобы отключить питание
+    // Writing 0 to disable device
     let mut file = OpenOptions::new()
         .write(true)
         .open(&authorized_file)?;

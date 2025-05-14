@@ -6,6 +6,8 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use crate::push_log;
 
+// This function will load hashes of viruses so the program could
+// compare them with the hashes on flash drive
 pub fn load_hashes_from_file(path: &str) -> HashSet<String> {
     let file = File::open(path).expect("Cannot open hash file");
     let reader = BufReader::new(file);
@@ -13,7 +15,7 @@ pub fn load_hashes_from_file(path: &str) -> HashSet<String> {
     reader
         .lines()
         .filter_map(|line| line.ok())
-        .map(|line| line.trim().to_lowercase()) // удалить пробелы, привести к нижнему регистру
+        .map(|line| line.trim().to_lowercase()) 
         .collect()
 }
 
