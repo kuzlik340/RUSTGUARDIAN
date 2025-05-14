@@ -14,6 +14,7 @@ use lazy_static::lazy_static;
 use chrono::Local;
 use notify_rust::Notification;
 
+
 use engine::find_device::find_all_devices;
 use CLI::cli::run_cli;
 use crate::CLI::whitelist::create_whitelist_from_connected_devices;
@@ -25,6 +26,8 @@ lazy_static! {
     pub static ref HASH_SET: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
     pub static ref WHITELIST: RwLock<HashMap<String, String>> = RwLock::new(HashMap::new());
     pub static ref FIND_THREAD_RUNNING: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+    pub static ref WHITELIST_READY: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+
 }
 
 /// Struct to monitor devices in LockDown mode
@@ -116,7 +119,7 @@ fn main() {
         let whitelist_set: HashMap<String, String> = create_whitelist_from_connected_devices();
         let mut whitelist = WHITELIST.write().unwrap();
         *whitelist = whitelist_set;
-
+        WHITELIST_READY.store(true, Ordering::SeqCst);
     }
 
     // Wait for CLI thread to finish
