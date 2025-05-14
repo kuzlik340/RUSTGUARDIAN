@@ -1,7 +1,10 @@
 mod engine;
 mod CLI;
 
-use std::{fs, path::Path};
+use std::{path::Path};
+use std::fs::{self, File};
+use std::io::{Write, BufWriter};
+use reqwest;
 use std::thread;
 use std::sync::{Arc, Mutex, RwLock};
 use std::collections::HashSet;
@@ -9,7 +12,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use std::thread::JoinHandle;
 use std::collections::HashMap;
-
 use lazy_static::lazy_static;
 use chrono::Local;
 use notify_rust::Notification;
@@ -34,6 +36,26 @@ lazy_static! {
 pub struct DeviceMonitor {
     running: Arc<AtomicBool>,
     handle: Option<JoinHandle<()>>,
+}
+
+
+/// Downloads SHA256 hashes from Abuse.ch and writes to a local file.
+pub fn download_and_save_hashes(path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let url = "https://bazaar.abuse.ch/export/txt/sha256/full/";
+    let response = reqwest::blocking::get(url)?.text()?;
+
+    let file = File::create(path)?;
+    let mut writer = BufWriter::new(file);
+
+    for line in response.lines() {
+        let line = line.trim();
+        if line.starts_with('#') || line.is_empty() {
+            continue;
+        }
+        writeln!(writer, "{}", line)?;
+    }
+
+    Ok(())
 }
 
 impl DeviceMonitor {
@@ -103,15 +125,16 @@ fn main() {
 
     // Load file hashes from project root
     let user_mount_path = format!("{}/hashes.txt", env!("CARGO_MANIFEST_DIR"));
+    
+    match download_and_save_hashes(&user_mount_path) {
+        Ok(_) => push_log("[INFO] Successfully downloaded and saved hashes from Abuse.ch".to_string()),
+        Err(e) => push_log(format!("[ERROR] Failed to download hashes: {}", e)),
+    }
+    
     {
         let mut hash_set = HASH_SET.lock().unwrap();
-        let mut user_mount_path = format!(
-            "/home/{}/RUST_PROJECT/RUST_PROJECT/hashes.txt",
-            std::env::var("SUDO_USER")
-                .or_else(|_| std::env::var("USER"))  // Fallback to USER if SUDO_USER not set
-                .unwrap_or_else(|_| "debian".into()) // Final fallback
-        );
         *hash_set = load_hashes_from_file(&user_mount_path);
+        push_log(format!("[INFO] Loaded {} hashes into memory", hash_set.len()));
     }
 
     // Initialize whitelist once
