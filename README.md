@@ -45,7 +45,7 @@ Through this project, we will get experience with Rust’s memory safety feature
 - **LockDown mode**, which will check the operational system for suspicious processes and all input devices if they are real keyboards.
 - **SafeConnection mode**, which checks whether the connected device is present in the whitelist and if not checks the mountable volumes for viruses.
 
-1) Behavior analysis and response:
+2) Behavior analysis and response:
 - Monitors the behavior of all connected devices.
 - Automatically disconnects devices and sends a notification if malicious activity is suspected or if a malicious file is detected on a mountable volume.
 - Sends a notification when malicious process was found.
@@ -57,7 +57,7 @@ Through this project, we will get experience with Rust’s memory safety feature
 
 <img width="818" alt="CLI" src="https://github.com/user-attachments/assets/a09c85a2-ea63-4568-b793-3e45e0337f41" />
 
-The command space will support various commands, some of which are yet to be defined in the project. However, the following are the essential ones for this stage of development:
+The command space supports this commands:
 ```
 > wadd [device_id]        # Will add device to a safe list
 > dlist                   # Will list all devices that are waiting for user decision
@@ -74,7 +74,7 @@ To detect when a USB device is connected or disconnected, we use the udev librar
 ```bash
 sudo apt-get install libudev-dev
 ```
-For the sandboxing and intercepting devices will be used evdev:
+For intercepting devices will be used evdev:
 ```bash
 sudo apt-get install libevdev-dev
 ```
