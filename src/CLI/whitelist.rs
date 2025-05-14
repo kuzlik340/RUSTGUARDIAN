@@ -1,9 +1,5 @@
 use std::collections::HashSet;
 use std::process::Command;
-use notify_rust::Notification;
-use once_cell::sync::Lazy;
-use std::sync::Mutex;
-use crate::push_log;
 use lazy_static::lazy_static;
 use crate::RwLock;
 

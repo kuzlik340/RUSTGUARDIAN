@@ -2,7 +2,6 @@
 use super::whitelist::create_whitelist_from_connected_devices;
 use super::filehash::{hash_all_files_in_dir, load_hashes_from_file};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::Ordering;
 use std::fs;
 use notify_rust::Notification;
@@ -25,7 +24,7 @@ use std::{
 use tui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
-    style::{Modifier, Style, Color},
+    style::{Style, Color},
     text::{Span, Spans},
     widgets::{Block, Borders, Paragraph},
     Terminal,
@@ -62,7 +61,7 @@ pub fn folders(dir: &Path) -> Result<Vec<PathBuf>, io::Error> {
 
 // Entry point for the CLI interface
 pub fn run_cli() -> Result<(), Box<dyn Error>> {
-    if(std::env::var("USER").unwrap_or_default() != "root"){
+    if std::env::var("USER").unwrap_or_default() != "root" {
         push_log("The lockdown mode is disabled, since youn are not root".to_string());
     }
     enable_raw_mode()?;
@@ -72,7 +71,6 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     // Sets for detected devices and scanned mount paths
-    let mut pending_mounts: HashSet<String> = HashSet::new();
     let mut scanned_paths: HashSet<PathBuf> = HashSet::new();
 
     // DeviceList to hold detected but not whitelisted USB devices
@@ -269,7 +267,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                         }
 
                         "enable LockDown" => {
-                            if(std::env::var("USER").unwrap_or_default() != "root"){
+                            if std::env::var("USER").unwrap_or_default() != "root" {
                                 push_log("[SECURITY] You are not root".to_string());
                             }
                             else{
@@ -381,7 +379,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error>> {
                 // Update seen device list
                 known_devices = current_devices.keys().cloned().collect();
 
-                if(SafeConnection){
+                if SafeConnection {
                     // Check for mounted paths in /media
                     let user_mount_path = format!(
                         "/media/{}",

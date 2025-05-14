@@ -1,4 +1,4 @@
-use sysinfo::{System, SystemExt, ProcessExt, Pid};
+use sysinfo::{System, SystemExt, ProcessExt};
 use std::collections::HashSet;
 use lazy_static::lazy_static;
 use sysinfo::PidExt;

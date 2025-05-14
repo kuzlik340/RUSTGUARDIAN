@@ -142,8 +142,8 @@ crossterm = "0.27"
 - [x] Notification mechanism - create a system that will notify user if something goes wrong. (Assigned to Zinmitski)
 - [x] Create local storage for hashes of viruses (Assigned to Kuzin)
 - [x] Connect every module into one (Assigned to Kuzin)
-- [ ] Make a control for threads (Assigned to Kuzin)
-- [ ] Make a logic for list devices (Assigned to Kuzin)
-- [ ] Make a logic for updating hashes.txt (Assigned to Zimnitski)
-- [ ] Create a module which will go through processes to find malicious software. (Assigned to Kuzin)
-- [ ] Create daemons for the corresponding modules of antivirus. (Assigned to Zinmitski)
+- [x] Make a control for threads (Assigned to Kuzin)
+- [x] Make a logic for list devices (Assigned to Zimnitski)
+- [x] Make a logic for updating hashes.txt (Assigned to Zimnitski)
+- [x] Create a module which will go through processes to find malicious software. (Assigned to Kuzin)
+- [ ] Fix cargo.lock

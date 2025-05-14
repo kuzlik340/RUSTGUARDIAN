@@ -2,7 +2,7 @@ mod engine;
 mod CLI;
 
 use std::{path::Path};
-use std::fs::{self, File};
+use std::fs::{File};
 use std::io::{Write, BufWriter};
 use reqwest;
 use std::thread;
@@ -14,7 +14,6 @@ use std::thread::JoinHandle;
 use std::collections::HashMap;
 use lazy_static::lazy_static;
 use chrono::Local;
-use notify_rust::Notification;
 
 
 use engine::find_device::find_all_devices;

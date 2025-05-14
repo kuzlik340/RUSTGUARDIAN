@@ -1,21 +1,15 @@
 use udev::{MonitorBuilder, EventType};
 use super::keylogger;
 use std::thread;
-use std::io::{Write};
-use std::os::unix::io::AsRawFd;
 use std::time::Duration;
-use std::process::Command;
-use std::thread::sleep;
-use std::sync::mpsc;
 use std::sync::Arc;
-use std::sync::Mutex;
 use crate::push_log;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /* This is the function that will find all new connections of the input devices.
  * This is used in the LockDown mode so we could then intercept what the keyboard is writing into system */
 pub fn find_all_devices(running: Arc<AtomicBool>) -> std::io::Result<()> {
-    let mut monitor = MonitorBuilder::new()?.listen()?; // Create a monitor for monitoring events on all input devices
+    let monitor = MonitorBuilder::new()?.listen()?; // Create a monitor for monitoring events on all input devices
     push_log(format!("Starting RustGuardian for input devices, waiting for new devices..."));
     // Variables for controling the child threads
     let keyloggers_running = Arc::new(AtomicBool::new(true));

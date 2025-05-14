@@ -29,7 +29,6 @@ pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &s
     let key_map = create_keymap();
     let mut backspace_found: bool = false;
     let mut timestamps: Vec<u128> = Vec::new();
-    let mut speed_test = true;
     'outer: while running.load(Ordering::Relaxed) {
         for ev in device.fetch_events().expect("Failed to fetch events") {
             if let InputEventKind::Key(key) = ev.kind() {
@@ -57,13 +56,10 @@ pub fn start_logging(device_event_path: &str, device_path: &str, device_name: &s
                             }
                         }
                         if too_small_diff > 5 {
-                            let now = Local::now(); // Gets local time
-                            let timestamp = now.format("%Y-%m-%d %H:%M:%S").to_string();
                             push_log(format!("WARNING RustGuardian registered BadUSB attack, the device will be unmounted"));
                             unmount_device(device_path)?;
                             push_log(format!("Device was succesfully removed"));
                         }
-                        speed_test = false;
                         break 'outer;
                     }
                     if key != Key::KEY_BACKSPACE {
