@@ -55,7 +55,7 @@ Through this project, we will get experience with Rust’s memory safety feature
 2) Safe Devices List – shows user-approved devices that won’t be tracked as unrecognized.
 3) Commands Space - an interactive input area where users can enter commands to control and manage devices.
 
-<img width="818" alt="CLI" src="https://github.com/user-attachments/assets/a09c85a2-ea63-4568-b793-3e45e0337f41" />
+<img width="1440" alt="CLI" src="https://github.com/user-attachments/assets/c1ead785-9951-4bf1-bf8a-5d2adf3dc293" />
 
 The command space supports this commands:
 ```
